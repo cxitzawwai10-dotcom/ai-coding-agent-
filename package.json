@@ -1,0 +1,21 @@
+{
+  "name": "ai-coding-agent",
+  "version": "1.0.0",
+  "description": "Local AI Coding Agent for Android",
+  "main": "src/index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  }
+}
