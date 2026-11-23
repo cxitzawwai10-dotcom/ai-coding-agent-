@@ -32,3 +32,19 @@ test("AgentCore integrates with TaskPlanner", async () => {
   assert.equal(result.plan.status, "PLANNED");
   assert.equal(result.plan.steps.length, 6);
 });
+
+test("AgentCore handles planner errors safely", async () => {
+  const failingPlanner = {
+    createPlan() {
+      throw new Error("Planner failure");
+    }
+  };
+
+  const agent = new AgentCore(failingPlanner);
+  const result = await agent.processTask("Build an application");
+
+  assert.equal(result.status, "FAILED");
+  assert.equal(result.error, "Planner failure");
+  assert.equal(result.lifecycle.state, "FAILED");
+  assert.deepEqual(result.lifecycle.history, ["RECEIVED", "FAILED"]);
+});

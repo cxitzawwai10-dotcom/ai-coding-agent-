@@ -18,19 +18,35 @@ export class AgentCore {
 
     const normalizedTask = task.trim();
     const lifecycle = new TaskLifecycle();
-    const plan = this.planner.createPlan(normalizedTask);
 
-    lifecycle.transition(TASK_STATES.PLANNED);
+    try {
+      const plan = this.planner.createPlan(normalizedTask);
 
-    return {
-      task: normalizedTask,
-      status: "RECEIVED",
-      message: "Task received and planning completed.",
-      plan,
-      lifecycle: {
-        state: lifecycle.getState(),
-        history: lifecycle.getHistory()
-      }
-    };
+      lifecycle.transition(TASK_STATES.PLANNED);
+
+      return {
+        task: normalizedTask,
+        status: "RECEIVED",
+        message: "Task received and planning completed.",
+        plan,
+        lifecycle: {
+          state: lifecycle.getState(),
+          history: lifecycle.getHistory()
+        }
+      };
+    } catch (error) {
+      lifecycle.transition(TASK_STATES.FAILED);
+
+      return {
+        task: normalizedTask,
+        status: "FAILED",
+        message: "Task planning failed.",
+        error: error instanceof Error ? error.message : String(error),
+        lifecycle: {
+          state: lifecycle.getState(),
+          history: lifecycle.getHistory()
+        }
+      };
+    }
   }
 }
