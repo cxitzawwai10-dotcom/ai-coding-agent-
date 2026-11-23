@@ -23,3 +23,12 @@ test("AgentCore rejects an empty task", async () => {
     /Task must be a non-empty string/
   );
 });
+
+test("AgentCore integrates with TaskPlanner", async () => {
+  const agent = new AgentCore();
+  const result = await agent.processTask("Build an AI coding agent");
+
+  assert.equal(result.status, "RECEIVED");
+  assert.equal(result.plan.status, "PLANNED");
+  assert.equal(result.plan.steps.length, 6);
+});
