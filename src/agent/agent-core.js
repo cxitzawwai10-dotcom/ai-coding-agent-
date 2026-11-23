@@ -1,4 +1,5 @@
 import { TaskPlanner } from "./task-planner.js";
+import { TaskLifecycle, TASK_STATES } from "./task-lifecycle.js";
 
 export class AgentCore {
   constructor(planner = new TaskPlanner()) {
@@ -16,13 +17,20 @@ export class AgentCore {
     }
 
     const normalizedTask = task.trim();
+    const lifecycle = new TaskLifecycle();
     const plan = this.planner.createPlan(normalizedTask);
+
+    lifecycle.transition(TASK_STATES.PLANNED);
 
     return {
       task: normalizedTask,
       status: "RECEIVED",
       message: "Task received and planning completed.",
-      plan
+      plan,
+      lifecycle: {
+        state: lifecycle.getState(),
+        history: lifecycle.getHistory()
+      }
     };
   }
 }
