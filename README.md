@@ -44,7 +44,7 @@ A local Android install can perform the sign-in and export step even if Docker i
 - Both model discovery and Responses API inference use the fixed base URL `https://api.openai.com/v1`.
 - Responses are streamed with `store:false`; completion is accepted only after `response.completed`.
 - API keys, ChatGPT cookies, private session endpoints, and silent API-billing fallback are not used.
-- The browser API is protected by a separate bearer token. Use HTTPS when accessing a remote VM and never expose the service directly to the public internet.
+- The browser API is protected by a separate bearer token, throttles repeated invalid bearer attempts, rejects non-JSON request bodies, and sends browser isolation headers. Use HTTPS when accessing a remote VM and never expose the service directly to the public internet.
 - Code changes are restricted to inspected paths, displayed in full within the proposal review limit, and require explicit user approval before writes and tests.
 
 ## Tests
