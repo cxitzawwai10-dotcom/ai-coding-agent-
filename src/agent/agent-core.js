@@ -261,7 +261,7 @@ export class AgentCore {
     if (!tool.requiresApproval) {
       throw new Error("This tool does not require approval.");
     }
-    return this.approvalManager.request(id, input, this.toolRegistry.getApprovalBinding(id));
+    return this.approvalManager.request(id, input, this.toolRegistry.getApprovalBinding?.(id) ?? null);
   }
 
   approveToolRequest(requestId) {
