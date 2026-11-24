@@ -44,7 +44,16 @@ editing, debugging, testing, and persistent project memory.
 - Require workspace inspection before preparing a bounded change proposal.
 - Bind each proposed file path and content to its own one-time trusted approval token.
 - Apply changes through the protected workspace write tool only after task approval.
-- Report completed writes separately from automated test verification; test execution is not yet configured.
+- Optionally run the workspace test suite after writes, with a separate one-time test approval.
+- Mark the task failed when the approved test run fails; report writes and test results distinctly.
+
+### Workspace Test Runner
+- Register `workspace.test` when a workspace is attached.
+- Run only the fixed Node.js built-in test command (`node --test`) from the workspace root; callers cannot supply commands or arguments.
+- Require a one-time trusted approval for every test run.
+- Limit execution to 120 seconds and capture at most 1 MB of combined output.
+- Pass a reduced environment to the test process.
+- Treat test files as executable project code: approval is required, but this is not an OS-level sandbox and tests still run with the agent process user's filesystem permissions.
 
 ### Tool Workflow Executor
 - Execute a prevalidated sequence of registered tools in order.
@@ -83,6 +92,7 @@ editing, debugging, testing, and persistent project memory.
 - Follow provider authentication and service terms.
 - Do not use account switching to bypass quotas.
 - Ask for approval before destructive operations.
+- Do not treat approval-gated project tests as sandboxed code.
 
 ## 5. Development Phases
 1. Project foundation and architecture.
