@@ -21,6 +21,10 @@ The setup command creates a private `.env` file with two independent random secr
 
 Open `http://127.0.0.1:8787` on the same device. Enter the generated `AI_AGENT_ACCESS_TOKEN` from `.env` into the browser UI. Select **Continue with ChatGPT** to run the official loopback OAuth flow. The account's model list is fetched after connection or account switch.
 
+## Run locally on Android (Termux)
+
+For the phone-only local browser test, follow [`docs/termux-android-quickstart.md`](docs/termux-android-quickstart.md). The helper script checks Node.js 24+, installs project packages, creates private local secrets, and starts the browser on `http://127.0.0.1:8787`. Open that address in Chrome on the same Android phone. This is a browser app, not an APK. Docker-based coding execution still belongs on a Docker-enabled host.
+
 ## Android + self-hosted VM
 
 The OAuth callback must reach the same local device that launched the browser. For a remote self-hosted VM, do not try to log in directly from the remote browser page.
