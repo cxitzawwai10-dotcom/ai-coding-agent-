@@ -17,5 +17,11 @@
 - The data directory must be private to the agent process and backed up by the deployment. JSON persistence does not encrypt memory at rest.
 - The current task registry and in-flight task lifecycle remain in-memory; durable task-history restoration is not claimed as completed in this phase.
 
-## Verification
-GitHub Actions verification is pending for the Phase 3 implementation commit. Phase 3 must not be marked complete until the CI run and all test logs are checked.
+## Verified GitHub Actions results
+- CI run [45365646261](https://github.com/cxitzawwai10-dotcom/ai-coding-agent-/actions/runs/45365646261): successful.
+- Node.js 24 suite: **99 tests, 98 passed, 0 failed, 1 intentionally skipped** (the real Docker integration test runs in its own job).
+- Docker sandbox integration: **1 passed, 0 failed**.
+- Phase 2 Security Tests workflow for the same implementation commit: successful; its Node.js suite also reported 98 passed, 0 failed, 1 skipped.
+
+## Phase 3 completion boundary
+Project metadata and project-scoped memory persistence are implemented and CI-verified. The in-memory AgentCore task registry/lifecycle is not yet restored across process restarts; full durable task-history restoration is a separate remaining item and is not claimed as complete here. Multi-process storage and encryption at rest are also deployment requirements not covered by this local JSON adapter.
