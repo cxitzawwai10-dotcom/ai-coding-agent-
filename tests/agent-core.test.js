@@ -427,7 +427,7 @@ test("AgentCore marks coding execution failed when approved workspace tests fail
     const result = await agent.executeCodingChanges(task.taskId, [writeToken], testToken);
     assert.equal(result.status, TASK_STATES.FAILED);
     assert.match(result.error, /Workspace tests failed/);
-    assert.equal(await fs.readFile(path.join(root, "source.js"), "utf8"), "export const value = 2;\n");
+    assert.equal(await fs.readFile(path.join(root, "source.js"), "utf8"), "export const value = 1;\n");
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }
