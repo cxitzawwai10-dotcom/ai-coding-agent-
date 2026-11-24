@@ -27,11 +27,15 @@ test("App entry connects AgentCore to workspace tools", async () => {
   );
 
   try {
-    const { agent, workspaceRoot } = createAgent({
-      workspaceRoot: root
+    const { agent, workspaceRoot, projectManager, projectMemory, dataRoot } = createAgent({
+      workspaceRoot: root,
+      dataRoot: path.join(root, "agent-state")
     });
 
     assert.equal(workspaceRoot, root);
+    assert.equal(dataRoot, path.join(root, "agent-state"));
+    assert.ok(projectManager);
+    assert.ok(projectMemory);
 
     const ids = agent.getTools().map(tool => tool.id);
 
