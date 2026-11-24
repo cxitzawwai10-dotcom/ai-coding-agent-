@@ -20,8 +20,7 @@ export class ChatGPTClient {
     this.models = [];
     this.modelsForAccountId = null;
   }
-  async #tokens() {
-    const account = await this.accountStore.getActiveAccount();
+  async #tokens(account) {
     if (!account) throw new Error("Sign in with ChatGPT and select an account first.");
     if (!account.scopes.includes(PLAN_SCOPE)) throw new Error("This ChatGPT account has identity sign-in only; ChatGPT plan usage permission was not granted.");
     if (account.needsReauth) throw new Error("This ChatGPT account needs to be reconnected. Choose Reconnect in the account list.");
@@ -38,7 +37,7 @@ export class ChatGPTClient {
           throw new Error("ChatGPT session refresh failed (HTTP " + response.status + "). " + (code || "Reconnect the account if the session has expired."));
         }
         if (!refreshed.refresh_token || !Number.isFinite(Number(refreshed.expires_in))) throw new Error("ChatGPT refresh response did not include a replacement refresh token and expiry.");
-        await this.accountStore.updateTokens(account.id, refreshed, String(refreshed.scope || "").split(/\s+/).filter(Boolean));
+        await this.accountStore.updateTokens(account.id, refreshed, String(refreshed.scope || "").split(/\\s+/).filter(Boolean));
         return refreshed.access_token;
       })();
       this.refreshes.set(account.id, refreshPromise);
@@ -48,16 +47,28 @@ export class ChatGPTClient {
     return account.tokens.accessToken;
   }
   async listModels() {
+    const epoch = this.accountEpoch;
     const account = await this.accountStore.getActiveAccount();
     if (!account) throw new Error("No active ChatGPT account.");
-    const token = await this.#tokens();
-    const response = await this.fetchImpl(API_BASE + "/models", { headers: { authorization: "Bearer " + token, accept: "application/json" } });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error("ChatGPT model catalog request failed (HTTP " + response.status + ").");
-    const rows = Array.isArray(payload.models) ? payload.models : [];
-    this.models = rows.filter(item => item && item.visibility === "list" && typeof item.slug === "string" && typeof item.display_name === "string").map(item => ({ id: item.slug, name: item.display_name }));
-    this.modelsForAccountId = account.id;
-    return this.models;
+    const token = await this.#tokens(account);
+    if (epoch !== this.accountEpoch) throw new Error("ChatGPT account changed before model discovery completed.");
+    const controller = new AbortController();
+    this.controllers.add(controller);
+    const timer = setTimeout(() => controller.abort(new Error("ChatGPT model discovery timed out.")), this.timeoutMs);
+    try {
+      const response = await this.fetchImpl(API_BASE + "/models", { signal: controller.signal, headers: { authorization: "Bearer " + token, accept: "application/json" } });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error("ChatGPT model catalog request failed (HTTP " + response.status + ").");
+      if (epoch !== this.accountEpoch) throw new Error("ChatGPT account changed while refreshing the model list.");
+      const rows = Array.isArray(payload.models) ? payload.models : [];
+      const models = rows.filter(item => item && item.visibility === "list" && typeof item.slug === "string" && typeof item.display_name === "string").map(item => ({ id: item.slug, name: item.display_name }));
+      this.models = models;
+      this.modelsForAccountId = account.id;
+      return models;
+    } finally {
+      clearTimeout(timer);
+      this.controllers.delete(controller);
+    }
   }
   async generate({ prompt, model, systemInstruction = "" }) {
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 100000) throw new Error("Prompt must be 1-100000 characters.");
@@ -66,8 +77,10 @@ export class ChatGPTClient {
     if (!account) throw new Error("No active ChatGPT account.");
     if (this.modelsForAccountId !== account.id) await this.listModels();
     if (epoch !== this.accountEpoch) throw new Error("ChatGPT account changed before the request started.");
+    const currentAccount = await this.accountStore.getActiveAccount();
+    if (!currentAccount || currentAccount.id !== account.id) throw new Error("ChatGPT account changed before the request started.");
     if (!this.models.some(item => item.id === model)) throw new Error("Select a model available to the active ChatGPT account.");
-    const token = await this.#tokens();
+    const token = await this.#tokens(account);
     if (epoch !== this.accountEpoch) throw new Error("ChatGPT account changed before the request started.");
     const controller = new AbortController();
     this.controllers.add(controller);
@@ -89,11 +102,11 @@ export class ChatGPTClient {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+        buffer += decoder.decode(value, { stream: true }).replace(/\\r\\n/g, "\\n");
         let split;
-        while ((split = buffer.indexOf("\n\n")) >= 0) {
+        while ((split = buffer.indexOf("\\n\\n")) >= 0) {
           const frame = buffer.slice(0, split); buffer = buffer.slice(split + 2);
-          const data = frame.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("\n");
+          const data = frame.split("\\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("\\n");
           if (!data || data === "[DONE]") continue;
           let event; try { event = JSON.parse(data); } catch { continue; }
           if (event.type === "response.output_text.delta") output += event.delta || "";
