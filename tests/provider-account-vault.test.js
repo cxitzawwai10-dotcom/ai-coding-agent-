@@ -10,8 +10,7 @@ test("account vault encrypts credentials and supports any configured account cou
   try {
     const filePath = path.join(root, "accounts.json");
     const vault = new AccountVault({ filePath, masterSecret: "a-test-master-secret-at-least-32-chars" });
-    const added = [];
-    for (let i = 0; i < 5; i += 1) added.push(await vault.addAccount({ provider: "gemini", label: `Gemini ${i}`, apiKey: `secret-key-${i}-long` }));
+    const added = await Promise.all(Array.from({ length: 5 }, (_, i) => vault.addAccount({ provider: "gemini", label: `Gemini ${i}`, apiKey: `secret-key-${i}-long` })));
     assert.equal((await vault.listAccounts()).length, 5);
     assert.equal((await vault.getActiveAccount()).apiKey, "secret-key-0-long");
     assert.doesNotMatch(await readFile(filePath, "utf8"), /secret-key-/);
