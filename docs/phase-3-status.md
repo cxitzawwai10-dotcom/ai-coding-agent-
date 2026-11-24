@@ -16,7 +16,8 @@
 - Each JSON file is limited to 5 MiB; project count is limited to 500; memory entries to 2,000; each memory item to 10,000 characters.
 - Writes are serialized inside one Node.js process. This is not a multi-process transactional database. A multi-instance hosted deployment must replace this adapter with a transactional shared database before concurrent multi-instance writes are enabled.
 - The data directory must be private to the agent process and backed up by the deployment. JSON persistence does not encrypt memory at rest.
-- The current task registry and in-flight task lifecycle remain in-memory; durable task-history restoration is not claimed as completed in this phase.
+- Persistent task history uses a single-writer local JSON store. Run only one active agent process per `dataRoot`; multi-process hosted deployment requires a transactional shared database.
+- In-flight tasks are never resumed automatically after restart. Tasks found in `EXECUTING` state are marked `FAILED` with an interruption reason; inspect and retry deliberately.
 
 ## Verified GitHub Actions results
 - CI run [45365646261](https://github.com/cxitzawwai10-dotcom/ai-coding-agent-/actions/runs/45365646261): successful.
@@ -25,4 +26,4 @@
 - Phase 2 Security Tests workflow for the same implementation commit: successful; its Node.js suite also reported 98 passed, 0 failed, 1 skipped.
 
 ## Phase 3 completion boundary
-Project metadata and project-scoped memory persistence are implemented and CI-verified. The in-memory AgentCore task registry/lifecycle is not yet restored across process restarts; full durable task-history restoration is a separate remaining item and is not claimed as complete here. Multi-process storage and encryption at rest are also deployment requirements not covered by this local JSON adapter.
+Project metadata, project-scoped memory, and durable task history are implemented. Multi-process transactional storage and encryption at rest remain deployment requirements and are not covered by this local JSON adapter.
