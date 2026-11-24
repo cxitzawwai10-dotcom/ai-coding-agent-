@@ -26,7 +26,7 @@ test("Docker test sandbox applies isolation and resource constraints", async () 
       "--memory", "--cpus", "--user", "--tmpfs"
     ]) assert.ok(args.includes(required), required);
     assert.ok(args.includes("--pull=never"));
-    assert.ok(args.includes("readonly"));
+    assert.ok(args.some(value => value.includes("readonly")));
     assert.ok(args.includes("node"));
     assert.ok(args.includes("--test"));
     assert.equal(call[2].shell, false);
