@@ -349,6 +349,14 @@ export class AgentCore {
         approvalTokens.some(token => typeof token !== "string" || !token)) {
       throw new Error("A separate trusted approval token is required for every file change.");
     }
+    if (testApprovalToken !== null) {
+      if (typeof testApprovalToken !== "string" || !testApprovalToken) {
+        throw new Error("A trusted approval token is required to run workspace tests.");
+      }
+      if (!this.toolRegistry.get("workspace.test")) {
+        throw new Error("Workspace test tool is not registered.");
+      }
+    }
     return this.executeTask(taskId, async () => {
       const results = [];
       for (let index = 0; index < changes.length; index += 1) {
@@ -362,12 +370,6 @@ export class AgentCore {
       }
       let tests = null;
       if (testApprovalToken !== null) {
-        if (typeof testApprovalToken !== "string" || !testApprovalToken) {
-          throw new Error("A trusted approval token is required to run workspace tests.");
-        }
-        if (!this.toolRegistry.get("workspace.test")) {
-          throw new Error("Workspace test tool is not registered.");
-        }
         tests = await this.executeTool(
           "workspace.test",
           {},
