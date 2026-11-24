@@ -1,9 +1,11 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, scryptSync } from "node:crypto";
 import { JsonStore } from "../storage/json-store.js";
 
 const VERSION = 1;
 const MAX_ACCOUNTS = 100;
 const REQUIRED_SCOPE = "chatgpt.tokens.use.direct";
+const BUNDLE_AAD = Buffer.from("AI-CODING-AGENT-CHATGPT-CREDENTIALS-V1");
+const MIN_BUNDLE_PASSPHRASE = 16;
 
 function keyFromSecret(secret) {
   if (typeof secret !== "string" || secret.length < 32) throw new Error("AI_AGENT_VAULT_KEY must contain at least 32 characters.");
@@ -124,6 +126,81 @@ export class ChatGPTAccountStore {
       found.expiresAt = new Date(0).toISOString();
       found.needsReauth = true;
       return this.#public(found);
+    });
+  }
+  async exportCredentialBundle(id, passphrase) {
+    if (typeof passphrase !== "string" || passphrase.length < MIN_BUNDLE_PASSPHRASE) throw new Error("Credential transfer passphrase must contain at least 16 characters.");
+    const account = await this.getAccountForAuthorization(id);
+    if (!account) throw new Error("ChatGPT account not found.");
+    const payload = {
+      version: 1,
+      account: {
+        issuer: account.issuer,
+        subject: account.subject,
+        clientId: account.clientId,
+        email: account.email,
+        name: account.name,
+        idToken: account.tokens.idToken,
+        tokens: {
+          access_token: account.tokens.accessToken,
+          refresh_token: account.tokens.refreshToken,
+          expires_in: Math.max(0, (Date.parse(account.expiresAt) - Date.now()) / 1000)
+        },
+        scopes: account.scopes
+      }
+    };
+    const salt = randomBytes(16);
+    const iv = randomBytes(12);
+    const key = scryptSync(passphrase, salt, 32, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+    cipher.setAAD(BUNDLE_AAD);
+    const encrypted = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
+    return {
+      version: 1,
+      kdf: "scrypt",
+      cipher: "aes-256-gcm",
+      salt: salt.toString("base64"),
+      iv: iv.toString("base64"),
+      tag: cipher.getAuthTag().toString("base64"),
+      ciphertext: encrypted.toString("base64")
+    };
+  }
+  async importCredentialBundle(bundle, passphrase, extAgentHostId) {
+    if (typeof passphrase !== "string" || passphrase.length < MIN_BUNDLE_PASSPHRASE) throw new Error("Credential transfer passphrase must contain at least 16 characters.");
+    if (!bundle || bundle.version !== 1 || bundle.kdf !== "scrypt" || bundle.cipher !== "aes-256-gcm" ||
+        !["salt", "iv", "tag", "ciphertext"].every(key => typeof bundle[key] === "string")) {
+      throw new Error("Credential transfer file has an unsupported format.");
+    }
+    const ciphertext = Buffer.from(bundle.ciphertext, "base64");
+    if (!ciphertext.length || ciphertext.length > 1024 * 1024) throw new Error("Credential transfer file exceeds its size limit.");
+    let payload;
+    try {
+      const salt = Buffer.from(bundle.salt, "base64");
+      const iv = Buffer.from(bundle.iv, "base64");
+      const tag = Buffer.from(bundle.tag, "base64");
+      if (salt.length !== 16 || iv.length !== 12 || tag.length !== 16) throw new Error("Invalid encrypted credential metadata.");
+      const key = scryptSync(passphrase, salt, 32, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+      const decipher = createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAAD(BUNDLE_AAD);
+      decipher.setAuthTag(tag);
+      payload = JSON.parse(Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8"));
+    } catch {
+      throw new Error("Credential transfer could not be decrypted. Check the file and passphrase.");
+    }
+    const item = payload?.account;
+    if (payload?.version !== 1 || !item || item.issuer !== "https://auth.openai.com" ||
+        typeof item.subject !== "string" || !item.subject || !/^oaiapp_[A-Za-z0-9_-]+$/.test(item.clientId || "") ||
+        typeof item.email !== "string" || typeof item.idToken !== "string" ||
+        typeof item.tokens?.access_token !== "string" || !item.tokens.access_token ||
+        (item.tokens.refresh_token !== null && typeof item.tokens.refresh_token !== "string") ||
+        !Array.isArray(item.scopes) || item.scopes.some(scope => typeof scope !== "string")) {
+      throw new Error("Credential transfer contains an invalid ChatGPT account record.");
+    }
+    return this.saveVerifiedAccount({
+      issuer: item.issuer, subject: item.subject, clientId: item.clientId,
+      email: item.email, name: typeof item.name === "string" ? item.name : "",
+      idToken: item.idToken, tokens: item.tokens, scopes: item.scopes,
+      extAgentHostId
     });
   }
   async updateTokens(id, tokens, scopes) {
