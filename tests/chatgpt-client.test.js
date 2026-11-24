@@ -53,3 +53,42 @@ test("clears a terminally revoked refresh token without switching accounts", asy
   await assert.rejects(client.listModels(),/refresh failed/);
   assert.equal(cleared,"revoked");
 });
+
+test("account switching aborts model discovery and prevents stale models from replacing the new account catalog", async () => {
+  let active = {id:"old",clientId:"oaiapp_old",scopes:["chatgpt.tokens.use.direct"],expiresAt:new Date(Date.now()+3600000).toISOString(),tokens:{accessToken:"old-token"}};
+  let oldStarted;
+  const started = new Promise(resolve=>oldStarted=resolve);
+  const fetchImpl = async (url,options={}) => {
+    if (!url.endsWith("/models")) throw new Error("Unexpected URL");
+    if (options.headers.authorization === "Bearer old-token") {
+      oldStarted();
+      return await new Promise((resolve,reject)=>{
+        options.signal.addEventListener("abort",()=>reject(options.signal.reason || new Error("aborted")),{once:true});
+      });
+    }
+    return {ok:true,json:async()=>({models:[{visibility:"list",slug:"new-model",display_name:"New Model"}]})};
+  };
+  const store={async getActiveAccount(){return active;}};
+  const client=new ChatGPTClient({accountStore:store,fetchImpl});
+  const stale=client.listModels();
+  await started;
+  client.cancelActiveRequests();
+  active={id:"new",clientId:"oaiapp_new",scopes:["chatgpt.tokens.use.direct"],expiresAt:new Date(Date.now()+3600000).toISOString(),tokens:{accessToken:"new-token"}};
+  await assert.rejects(stale);
+  const models=await client.listModels();
+  assert.deepEqual(models,[{id:"new-model",name:"New Model"}]);
+  assert.equal(client.modelsForAccountId,"new");
+});
+
+test("never sends a request using the previous account after a switch during token preparation", async () => {
+  let active={id:"old",clientId:"oaiapp_old",scopes:["chatgpt.tokens.use.direct"],expiresAt:new Date(Date.now()+3600000).toISOString(),tokens:{accessToken:"old-token"}};
+  let release;
+  const wait=new Promise(resolve=>release=resolve);
+  const store={async getActiveAccount(){await wait;return active;}};
+  const client=new ChatGPTClient({accountStore:store,fetchImpl:async()=>{throw new Error("must not call fetch");}});
+  const pending=client.listModels();
+  client.cancelActiveRequests();
+  active={id:"new",clientId:"oaiapp_new",scopes:["chatgpt.tokens.use.direct"],expiresAt:new Date(Date.now()+3600000).toISOString(),tokens:{accessToken:"new-token"}};
+  release();
+  await assert.rejects(pending,/account changed/);
+});
