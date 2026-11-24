@@ -1,7 +1,7 @@
 # Android Browser and ChatGPT OAuth Deployment
 
 ## Current supported mode
-The Sign in with ChatGPT open-source plan-usage flow uses a loopback callback such as http://127.0.0.1:<port>/auth/openai/callback. The AI Coding Agent must therefore run on the same device/environment that opens the system browser. The app binds to 127.0.0.1 by default.
+The Sign in with ChatGPT open-source plan-usage flow uses a loopback callback such as http://127.0.0.1:<port>/auth/callback. The AI Coding Agent must therefore run on the same device/environment that opens the system browser. The app binds to 127.0.0.1 by default.
 
 A remote Node.js host accessed from an Android browser cannot receive the phone's loopback callback. This repository deliberately refuses ChatGPT plan OAuth when AI_AGENT_HOST is set to a remote interface. Do not work around this with a localhost substitution, cookie scraping, or ChatGPT private endpoints.
 
