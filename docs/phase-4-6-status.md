@@ -3,7 +3,7 @@
 ## Phase 4 — ChatGPT account login and plan usage
 - Replaced the Gemini/OpenAI API-key provider path with a ChatGPT-only account architecture based on OpenAI's documented Sign in with ChatGPT open-source OAuth flow.
 - Added a persistent encrypted account store (AES-256-GCM), supports up to 100 user-managed accounts, and stores each account's issued OAuth client ID, verified identity, scopes, access token, refresh token, and ID token separately.
-- Added OAuth Authorization Code + PKCE, fresh state and nonce, a persistent per-host ext_agent_host_id, callback client-ID binding checks, OpenAI JWKS signature validation, and issuer/audience/expiry/nonce checks.
+- Added OAuth Authorization Code + PKCE, fresh state and nonce, a persistent per-host ext_agent_host_id, callback client-ID binding checks, OpenAI JWKS signature validation, issuer/audience/issued-at/not-before/expiry/nonce checks, and a bounded ID-token size limit.
 - Account switching cancels in-flight Responses requests, changes the active account, and fetches that account's current model catalog. Both model discovery and inference use the fixed public API base https://api.openai.com/v1; inference uses /responses, store:false, and stream:true, and is successful only after response.completed.
 - No ChatGPT browser cookies, private session endpoints, API keys, or silent billing fallback are used. Identity-only sign-in does not enable inference: the chatgpt.tokens.use.direct scope is required.
 - API failures preserve HTTP status, response code/detail, request ID, and Retry-After metadata. Plan-usage limit and eligibility errors stop inference with documented recovery guidance; no automatic account or billing fallback is attempted.
