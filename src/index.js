@@ -61,12 +61,12 @@ if (isMain) {
   const agent = startAgent();
   const args = process.argv.slice(2);
   if (args.length > 0) {
-    if (args.length !== 3 || args[0] !== "--tool" || args[2] !== "--input") {
+    if (args.length !== 4 || args[0] !== "--tool" || args[2] !== "--input") {
       console.error("Usage: node src/index.js --tool <tool-id> --input '<json>'");
       process.exitCode = 2;
     } else {
       try {
-        await runToolCommand(agent, args[1], process.argv[process.argv.indexOf("--input") + 1]);
+        await runToolCommand(agent, args[1], args[3]);
       } catch (error) {
         console.error("TOOL ERROR:", error instanceof Error ? error.message : String(error));
         process.exitCode = 1;
