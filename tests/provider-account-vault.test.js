@@ -39,7 +39,6 @@ test("daily quota cooldown persists for 24 hours and disables active selection",
 test("vault requires a strong master secret", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "provider-secret-"));
   try {
-    const vault = new AccountVault({ filePath: path.join(root, "accounts.json"), masterSecret: "short" });
-    await assert.rejects(vault.listAccounts(), /at least 32/);
+    assert.throws(() => new AccountVault({ filePath: path.join(root, "accounts.json"), masterSecret: "short" }), /at least 32/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
