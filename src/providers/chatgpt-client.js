@@ -48,12 +48,14 @@ export class ChatGPTClient {
   }
   async generate({ prompt, model, systemInstruction = "" }) {
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 100000) throw new Error("Prompt must be 1-100000 characters.");
+    const epoch = this.accountEpoch;
     const account = await this.accountStore.getActiveAccount();
     if (!account) throw new Error("No active ChatGPT account.");
     if (this.modelsForAccountId !== account.id) await this.listModels();
+    if (epoch !== this.accountEpoch) throw new Error("ChatGPT account changed before the request started.");
     if (!this.models.some(item => item.id === model)) throw new Error("Select a model available to the active ChatGPT account.");
     const token = await this.#tokens();
-    const epoch = this.accountEpoch;
+    if (epoch !== this.accountEpoch) throw new Error("ChatGPT account changed before the request started.");
     const controller = new AbortController();
     this.controllers.add(controller);
     const timer = setTimeout(() => controller.abort(new Error("ChatGPT request timed out.")), this.timeoutMs);
@@ -74,7 +76,7 @@ export class ChatGPTClient {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
         let split;
         while ((split = buffer.indexOf("\n\n")) >= 0) {
           const frame = buffer.slice(0, split); buffer = buffer.slice(split + 2);
