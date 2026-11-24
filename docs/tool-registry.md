@@ -23,6 +23,8 @@ Workspace tools:
 - workspace.test (requires a one-time trusted approval token)
 
 The test tool accepts only an empty input object and runs the fixed `node --test` command from the attached workspace root. It does not accept shell commands, scripts, or caller-supplied arguments. Each run has a 120-second timeout and a 1 MB output cap. Coding change execution may run this tool after all approved writes when a separate test approval token is supplied.
+Coding changes are transaction-style: the Agent captures existing file contents or absence before applying writes. If a later write approval or approved test run fails, applied changes are restored in reverse order. Rollback verifies the post-write file identity before restoring/removing a target and reports any incomplete rollback.
+
 
 **Security boundary:** Node's test runner executes the workspace's test files as code. The approval gate does not sandbox that code; it runs with the agent process user's operating-system permissions. Only run tests from a workspace whose code you trust.
 
