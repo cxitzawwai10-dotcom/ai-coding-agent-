@@ -13,7 +13,8 @@ function apiFailure(label, response, payload) {
   const code = typeof error === "object" ? error?.code : (payload?.code || error);
   const detail = (typeof error === "object" ? error?.message : null) || payload?.detail || payload?.message || (typeof error === "string" ? error : "");
   const requestId = response.headers?.get?.("x-request-id");
-  const metadata = [code ? "code=" + code : null, requestId ? "request_id=" + requestId : null].filter(Boolean).join(", ");
+  const retryAfter = response.headers?.get?.("retry-after");
+  const metadata = [code ? "code=" + code : null, requestId ? "request_id=" + requestId : null, retryAfter ? "retry_after=" + retryAfter : null].filter(Boolean).join(", ");
   const hints = {
     subscription_sharing_user_not_eligible: "This ChatGPT account or workspace is not eligible for plan usage. Choose an eligible account; do not retry the same request.",
     subscription_sharing_usage_limit_exceeded: "Pause requests using this ChatGPT plan and review ChatGPT Settings → Usage. Do not assume a reset time.",
@@ -143,7 +144,14 @@ export class ChatGPTClient {
             const param = failure.param ? "; param=" + failure.param : "";
             const requestId = response.headers?.get?.("x-request-id");
             const request = requestId ? "; request_id=" + requestId : "";
-            throw new Error("ChatGPT response failed: " + code + param + request + (failure.message ? ". " + String(failure.message).slice(0, 1000) : ""));
+            const recovery = code === "subscription_sharing_usage_limit_exceeded"
+              ? " Pause requests using this ChatGPT plan and review ChatGPT Settings → Usage; do not assume a reset time."
+              : code === "subscription_sharing_user_not_eligible"
+                ? " This ChatGPT account or workspace is not eligible for plan usage; choose an eligible account."
+                : code === "subscription_sharing_usage_unavailable"
+                  ? " Preserve credentials and retry later with bounded backoff."
+                  : "";
+            throw new Error("ChatGPT response failed: " + code + param + request + (failure.message ? ". " + String(failure.message).slice(0, 1000) : "") + recovery);
           }
           else if (event.type === "response.completed") completed = true;
           else if (event.type === "response.incomplete") throw new Error("ChatGPT response was incomplete: " + (event.response?.incomplete_details?.reason || "unknown reason"));
