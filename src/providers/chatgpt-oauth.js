@@ -61,7 +61,7 @@ export class ChatGPTOAuth {
   }
   async beginLogin({ redirectUri, existingAccountId = null, requestConsent = false }) {
     const callback = new URL(redirectUri);
-    if (callback.protocol !== "http:" || callback.hostname !== "127.0.0.1" || callback.pathname !== "/auth/openai/callback") throw new Error("ChatGPT plan sign-in requires the official 127.0.0.1 loopback callback.");
+    if (callback.protocol !== "http:" || callback.hostname !== "127.0.0.1" || callback.pathname !== "/auth/callback") throw new Error("ChatGPT plan sign-in requires the official 127.0.0.1 loopback callback.");
     for (const [pendingState, pending] of this.transactions) {
       if (this.clock() - pending.createdAt > 10 * 60 * 1000) this.transactions.delete(pendingState);
     }
