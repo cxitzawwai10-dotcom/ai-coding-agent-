@@ -18,3 +18,21 @@ test("Caddy template proxies HTTPS traffic to the loopback-only agent port", asy
   assert.match(caddy, /reverse_proxy 127\.0\.0\.1:8787/);
   assert.doesNotMatch(caddy, /reverse_proxy 0\.0\.0\.0/);
 });
+
+test("Termux startup script enforces supported Node.js and creates private local secrets", async () => {
+  const script = await readFile(new URL("../scripts/termux-start.sh", import.meta.url), "utf8");
+  assert.match(script, /NODE_MAJOR.*-lt 24/);
+  assert.match(script, /npm install --no-audit --no-fund/);
+  assert.match(script, /npm run setup/);
+  assert.match(script, /chmod 600 \.env/);
+  assert.match(script, /127\.0\.0\.1:8787/);
+  assert.match(script, /exec npm start/);
+});
+
+test("Android quickstart documents same-device loopback OAuth and Termux runtime limits", async () => {
+  const guide = await readFile(new URL("../docs/termux-android-quickstart.md", import.meta.url), "utf8");
+  assert.match(guide, /pkg install -y git nodejs npm/);
+  assert.match(guide, /127\.0\.0\.1:8787/);
+  assert.match(guide, /same Android phone/);
+  assert.match(guide, /Docker-based code execution/);
+});
