@@ -3,10 +3,16 @@ import { TaskLifecycle, TASK_STATES } from "./task-lifecycle.js";
 import { TaskRegistry } from "./task-registry.js";
 
 export class AgentCore {
-  constructor(planner = new TaskPlanner(), registry = new TaskRegistry()) {
+  constructor(
+    planner = new TaskPlanner(),
+    registry = new TaskRegistry(),
+    executor = null
+  ) {
     this.status = "INITIALIZED";
     this.planner = planner;
     this.registry = registry;
+    this.executor = executor;
+    this.lifecycles = new Map();
   }
 
   getStatus() {
@@ -34,6 +40,7 @@ export class AgentCore {
   }
 
   deleteTask(taskId) {
+    this.lifecycles.delete(taskId);
     return this.registry.delete(taskId);
   }
 
@@ -46,10 +53,13 @@ export class AgentCore {
     const lifecycle = new TaskLifecycle();
     const record = this.registry.create(normalizedTask);
 
+    this.lifecycles.set(record.id, lifecycle);
+
     try {
       const plan = this.planner.createPlan(normalizedTask);
 
       lifecycle.transition(TASK_STATES.PLANNED);
+
       this.registry.update(record.id, {
         status: TASK_STATES.PLANNED,
         result: plan
@@ -68,6 +78,7 @@ export class AgentCore {
       };
     } catch (error) {
       lifecycle.transition(TASK_STATES.FAILED);
+
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
@@ -81,6 +92,139 @@ export class AgentCore {
         task: normalizedTask,
         status: "FAILED",
         message: "Task planning failed.",
+        error: errorMessage,
+        lifecycle: {
+          state: lifecycle.getState(),
+          history: lifecycle.getHistory()
+        }
+      };
+    }
+  }
+
+  approveTask(taskId) {
+    const record = this.registry.get(taskId);
+    const lifecycle = this.lifecycles.get(taskId);
+
+    if (!record || !lifecycle) {
+      throw new Error("Task not found.");
+    }
+
+    lifecycle.transition(TASK_STATES.WAITING_FOR_APPROVAL);
+
+    const updated = this.registry.update(taskId, {
+      status: TASK_STATES.WAITING_FOR_APPROVAL
+    });
+
+    return {
+      taskId,
+      status: updated.status,
+      message: "Task approved and ready for execution.",
+      lifecycle: {
+        state: lifecycle.getState(),
+        history: lifecycle.getHistory()
+      }
+    };
+  }
+
+  rejectTask(taskId, reason = "Task approval rejected.") {
+    const record = this.registry.get(taskId);
+    const lifecycle = this.lifecycles.get(taskId);
+
+    if (!record || !lifecycle) {
+      throw new Error("Task not found.");
+    }
+
+    if (
+      typeof reason !== "string" ||
+      !reason.trim()
+    ) {
+      throw new Error("Rejection reason must be a non-empty string.");
+    }
+
+    lifecycle.transition(TASK_STATES.FAILED);
+
+    const updated = this.registry.update(taskId, {
+      status: TASK_STATES.FAILED,
+      error: reason.trim()
+    });
+
+    return {
+      taskId,
+      status: updated.status,
+      message: "Task was rejected and will not be executed.",
+      error: updated.error,
+      lifecycle: {
+        state: lifecycle.getState(),
+        history: lifecycle.getHistory()
+      }
+    };
+  }
+
+  async executeTask(taskId, executor = this.executor) {
+    const record = this.registry.get(taskId);
+    const lifecycle = this.lifecycles.get(taskId);
+
+    if (!record || !lifecycle) {
+      throw new Error("Task not found.");
+    }
+
+    if (record.status !== TASK_STATES.WAITING_FOR_APPROVAL) {
+      throw new Error("Task requires approval before execution.");
+    }
+
+    if (typeof executor !== "function") {
+      throw new Error("A valid task executor is required.");
+    }
+
+    lifecycle.transition(TASK_STATES.EXECUTING);
+
+    this.registry.update(taskId, {
+      status: TASK_STATES.EXECUTING
+    });
+
+    try {
+      const executionResult = await executor({
+        taskId,
+        task: record.task,
+        plan: record.result
+      });
+
+      lifecycle.transition(TASK_STATES.COMPLETED);
+
+      const updated = this.registry.update(taskId, {
+        status: TASK_STATES.COMPLETED,
+        result: {
+          plan: record.result,
+          executionResult
+        },
+        error: null
+      });
+
+      return {
+        taskId,
+        status: updated.status,
+        message: "Task execution completed.",
+        result: executionResult,
+        lifecycle: {
+          state: lifecycle.getState(),
+          history: lifecycle.getHistory()
+        }
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      lifecycle.transition(TASK_STATES.FAILED);
+
+      this.registry.update(taskId, {
+        status: TASK_STATES.FAILED,
+        error: errorMessage
+      });
+
+      return {
+        taskId,
+        status: TASK_STATES.FAILED,
+        message: "Task execution failed.",
         error: errorMessage,
         lifecycle: {
           state: lifecycle.getState(),

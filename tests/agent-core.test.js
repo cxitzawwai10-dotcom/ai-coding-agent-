@@ -1,11 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { AgentCore } from "../src/agent/agent-core.js";
-
-test("AgentCore initializes correctly", () => {
-  const agent = new AgentCore();
-  assert.equal(agent.getStatus(), "INITIALIZED");
-});
+import { TASK_STATES } from "../src/agent/task-lifecycle.js";
 
 test("AgentCore receives a valid task", async () => {
   const agent = new AgentCore();
@@ -87,4 +83,101 @@ test("AgentCore exposes task lookup, filtering, summary, and deletion", async ()
   assert.equal(agent.deleteTask(second.taskId), true);
   assert.equal(agent.getTask(second.taskId), null);
   assert.equal(agent.getTaskSummary().total, 1);
+});
+
+test("AgentCore requires approval before execution", async () => {
+  const agent = new AgentCore();
+  const task = await agent.processTask("Protected task");
+
+  await assert.rejects(
+    agent.executeTask(task.taskId),
+    /Task requires approval/
+  );
+
+  assert.equal(agent.getTask(task.taskId).status, TASK_STATES.PLANNED);
+});
+
+test("AgentCore approves a task before execution", async () => {
+  const agent = new AgentCore();
+  const task = await agent.processTask("Approval test");
+
+  const approval = agent.approveTask(task.taskId);
+
+  assert.equal(approval.status, TASK_STATES.WAITING_FOR_APPROVAL);
+  assert.deepEqual(approval.lifecycle.history, [
+    TASK_STATES.RECEIVED,
+    TASK_STATES.PLANNED,
+    TASK_STATES.WAITING_FOR_APPROVAL
+  ]);
+});
+
+test("AgentCore rejects a task without executing it", async () => {
+  let executed = false;
+  const agent = new AgentCore(undefined, undefined, async () => {
+    executed = true;
+  });
+
+  const task = await agent.processTask("Reject test");
+  agent.approveTask(task.taskId);
+
+  const result = agent.rejectTask(task.taskId, "User rejected");
+
+  assert.equal(result.status, TASK_STATES.FAILED);
+  assert.equal(result.error, "User rejected");
+  assert.equal(executed, false);
+});
+
+test("AgentCore executes an approved task successfully", async () => {
+  const agent = new AgentCore();
+  const task = await agent.processTask("Execute test");
+
+  agent.approveTask(task.taskId);
+
+  const result = await agent.executeTask(task.taskId, async context => {
+    assert.equal(context.task, "Execute test");
+    assert.equal(context.plan.status, "PLANNED");
+    return "Execution successful";
+  });
+
+  assert.equal(result.status, TASK_STATES.COMPLETED);
+  assert.equal(result.result, "Execution successful");
+  assert.deepEqual(result.lifecycle.history, [
+    "RECEIVED",
+    "PLANNED",
+    "WAITING_FOR_APPROVAL",
+    "EXECUTING",
+    "COMPLETED"
+  ]);
+});
+
+test("AgentCore records execution failures", async () => {
+  const agent = new AgentCore();
+  const task = await agent.processTask("Execution failure test");
+
+  agent.approveTask(task.taskId);
+
+  const result = await agent.executeTask(task.taskId, async () => {
+    throw new Error("Executor failure");
+  });
+
+  assert.equal(result.status, TASK_STATES.FAILED);
+  assert.equal(result.error, "Executor failure");
+  assert.equal(agent.getTask(task.taskId).status, TASK_STATES.FAILED);
+});
+
+test("AgentCore refuses execution without a valid executor", async () => {
+  const agent = new AgentCore();
+  const task = await agent.processTask("Missing executor test");
+
+  agent.approveTask(task.taskId);
+
+  await assert.rejects(
+    agent.executeTask(task.taskId),
+    /valid task executor is required/
+  );
+
+  assert.equal(
+    agent.getTask(task.taskId).status,
+    TASK_STATES.WAITING_FOR_APPROVAL
+  );
 });
