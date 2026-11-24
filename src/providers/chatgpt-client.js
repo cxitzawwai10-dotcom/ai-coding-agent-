@@ -1,6 +1,21 @@
 const API_BASE = "https://api.openai.com/v1";
 const PLAN_SCOPE = "chatgpt.tokens.use.direct";
 
+async function readErrorPayload(response) {
+  const raw = await response.text().catch(() => "");
+  if (!raw) return {};
+  try { return JSON.parse(raw); }
+  catch { return { detail: raw.slice(0, 1000) }; }
+}
+function apiFailure(label, response, payload) {
+  const error = payload?.error;
+  const code = typeof error === "object" ? error?.code : (payload?.code || error);
+  const detail = (typeof error === "object" ? error?.message : null) || payload?.detail || payload?.message || (typeof error === "string" ? error : "");
+  const requestId = response.headers?.get?.("x-request-id");
+  const metadata = [code ? "code=" + code : null, requestId ? "request_id=" + requestId : null].filter(Boolean).join(", ");
+  return label + " (HTTP " + response.status + (metadata ? "; " + metadata : "") + ")." + (detail ? " " + String(detail).slice(0, 1000) : "");
+}
+
 export class ChatGPTClient {
   constructor({ accountStore, fetchImpl = globalThis.fetch, timeoutMs = 120000 }) {
     if (!accountStore || typeof fetchImpl !== "function") throw new Error("ChatGPTClient requires an account store and fetch.");
@@ -30,11 +45,12 @@ export class ChatGPTClient {
       const refreshPromise = (async () => {
         const form = new URLSearchParams({ grant_type: "refresh_token", refresh_token: account.tokens.refreshToken, client_id: account.clientId, resource: API_BASE });
         const response = await this.fetchImpl("https://auth.openai.com/api/accounts/oauth/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, body: form.toString() });
-        const refreshed = await response.json().catch(() => ({}));
+        const refreshed = response.ok ? await response.json().catch(() => ({})) : await readErrorPayload(response);
         if (!response.ok || !refreshed.access_token) {
-          const code = refreshed.error || refreshed.code;
+          const rawError = refreshed.error;
+          const code = (typeof rawError === "object" ? rawError?.code : rawError) || refreshed.code;
           if (["invalid_grant","invalid_refresh_token","token_expired","refresh_token_expired","refresh_token_invalidated","refresh_token_reused"].includes(code)) await this.accountStore.clearCredentials(account.id);
-          throw new Error("ChatGPT session refresh failed (HTTP " + response.status + "). " + (code || "Reconnect the account if the session has expired."));
+          throw new Error(apiFailure("ChatGPT session refresh failed", response, refreshed) + (code ? "" : " Reconnect the account if the session has expired."));
         }
         if (!refreshed.refresh_token || !Number.isFinite(Number(refreshed.expires_in))) throw new Error("ChatGPT refresh response did not include a replacement refresh token and expiry.");
         await this.accountStore.updateTokens(account.id, refreshed, String(refreshed.scope || "").split(/\\s+/).filter(Boolean));
@@ -57,8 +73,8 @@ export class ChatGPTClient {
     const timer = setTimeout(() => controller.abort(new Error("ChatGPT model discovery timed out.")), this.timeoutMs);
     try {
       const response = await this.fetchImpl(API_BASE + "/models", { signal: controller.signal, headers: { authorization: "Bearer " + token, accept: "application/json" } });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error("ChatGPT model catalog request failed (HTTP " + response.status + ").");
+      const payload = response.ok ? await response.json().catch(() => ({})) : await readErrorPayload(response);
+      if (!response.ok) throw new Error(apiFailure("ChatGPT model catalog request failed", response, payload));
       if (epoch !== this.accountEpoch) throw new Error("ChatGPT account changed while refreshing the model list.");
       const rows = Array.isArray(payload.models) ? payload.models : [];
       const models = rows.filter(item => item && item.visibility === "list" && typeof item.slug === "string" && typeof item.display_name === "string").map(item => ({ id: item.slug, name: item.display_name }));
@@ -94,7 +110,7 @@ export class ChatGPTClient {
         headers: { authorization: "Bearer " + token, "content-type": "application/json", accept: "text/event-stream" },
         body: JSON.stringify({ model, input, store: false, stream: true })
       });
-      if (!response.ok) throw new Error("ChatGPT inference failed (HTTP " + response.status + ").");
+      if (!response.ok) throw new Error(apiFailure("ChatGPT inference failed", response, await readErrorPayload(response)));
       if (!response.body) throw new Error("ChatGPT did not return a response stream.");
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -111,9 +127,16 @@ export class ChatGPTClient {
           if (!data || data === "[DONE]") continue;
           let event; try { event = JSON.parse(data); } catch { continue; }
           if (event.type === "response.output_text.delta") output += event.delta || "";
-          else if (event.type === "response.failed") throw new Error("ChatGPT response failed: " + (event.response?.error?.code || "unknown_error"));
+          else if (event.type === "response.failed") {
+            const failure = event.response?.error || {};
+            const code = failure.code || "unknown_error";
+            const param = failure.param ? "; param=" + failure.param : "";
+            const requestId = response.headers?.get?.("x-request-id");
+            const request = requestId ? "; request_id=" + requestId : "";
+            throw new Error("ChatGPT response failed: " + code + param + request + (failure.message ? ". " + String(failure.message).slice(0, 1000) : ""));
+          }
           else if (event.type === "response.completed") completed = true;
-          else if (event.type === "response.incomplete") throw new Error("ChatGPT response was incomplete.");
+          else if (event.type === "response.incomplete") throw new Error("ChatGPT response was incomplete: " + (event.response?.incomplete_details?.reason || "unknown reason"));
         }
       }
       if (epoch !== this.accountEpoch) throw new Error("ChatGPT account changed while the request was running.");
