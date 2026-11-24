@@ -275,7 +275,7 @@ export class AgentCore {
 
 
 
-  async inspectTaskWorkspace(taskId, paths) {
+  async inspectTaskWorkspace(taskId, paths, { allowMissing = false } = {}) {
     const record = this.registry.get(taskId);
     if (!record || !this.lifecycles.has(taskId)) {
       throw new Error("Task not found.");
@@ -297,6 +297,7 @@ export class AgentCore {
     const files = [];
     for (const filePath of paths) {
       const snapshot = await this.workspaceTools.capture(filePath);
+      if (!snapshot.existed && allowMissing !== true) throw new Error(`Workspace file does not exist: ${filePath}`);
       files.push(snapshot.existed
         ? { path: filePath, exists: true, content: snapshot.content }
         : { path: filePath, exists: false, content: null });
