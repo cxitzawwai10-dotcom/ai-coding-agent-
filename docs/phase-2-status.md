@@ -19,10 +19,10 @@
 - Automated unit, integration, and security regression tests.
 
 ## Verified on GitHub Actions
-- Node.js 24 CI: **92 tests, 91 passed, 0 failed, 1 intentionally skipped** (the Docker integration test is run separately).
-- Real Docker sandbox integration: **1 passed, 0 failed** using the pinned Node.js image digest.
+- Node.js 24 CI: **93 tests, 92 passed, 0 failed, 1 intentionally skipped** (the real Docker integration test is run in its dedicated job).
+- Real Docker sandbox integration: **1 passed, 0 failed** using pinned image digest `sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5`.
 - Phase 2 Security Tests workflow: successful.
-- Verification is tied to commit `107e2700409554ca2a859aa784259d92b4dbf8ae` only if the workflow run for that exact commit is successful; otherwise treat the latest run status as pending.
+- Verified CI run: [GitHub Actions](https://github.com/cxitzawwai10-dotcom/ai-coding-agent-/actions/runs/45364786986).
 
 ## Known limitations carried forward
 - Android device end-to-end testing is deferred to Phase 6, when the Android browser interface and hosted execution backend are integrated.
