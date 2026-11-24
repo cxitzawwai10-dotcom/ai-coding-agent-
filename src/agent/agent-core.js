@@ -291,6 +291,82 @@ export class AgentCore {
     return { taskId, inspectedFiles: files.length, files };
   }
 
+
+  prepareCodingChanges(taskId, changes) {
+    const record = this.registry.get(taskId);
+    if (!record || !this.lifecycles.has(taskId)) throw new Error("Task not found.");
+    if (record.status !== TASK_STATES.PLANNED) {
+      throw new Error("Coding changes can only be prepared for planned tasks.");
+    }
+    if (!Array.isArray(changes) || changes.length === 0 || changes.length > 20) {
+      throw new Error("Coding change plan requires between 1 and 20 file changes.");
+    }
+    if (!Array.isArray(record.result?.workspaceInspection) ||
+        record.result.workspaceInspection.length === 0) {
+      throw new Error("Inspect workspace files before preparing coding changes.");
+    }
+    const seen = new Set();
+    const normalized = changes.map((change, index) => {
+      if (!change || typeof change !== "object" || Array.isArray(change) ||
+          Object.keys(change).some(key => !["path", "content"].includes(key)) ||
+          typeof change.path !== "string" || !change.path.trim() ||
+          typeof change.content !== "string" ||
+          Buffer.byteLength(change.content) > 1024 * 1024) {
+        throw new Error(`Invalid coding change at index ${index}.`);
+      }
+      if (seen.has(change.path)) throw new Error("Coding change paths must be unique.");
+      seen.add(change.path);
+      return { path: change.path, content: change.content };
+    });
+    if (!this.toolRegistry.get("workspace.write")) {
+      throw new Error("Workspace write tool is not registered.");
+    }
+    this.registry.update(taskId, {
+      result: { ...record.result, proposedChanges: normalized }
+    });
+    return {
+      taskId,
+      changes: normalized.map(({ path, content }) => ({
+        path,
+        bytes: Buffer.byteLength(content),
+        requiresApproval: true
+      }))
+    };
+  }
+
+  async executeCodingChanges(taskId, approvalTokens) {
+    const record = this.registry.get(taskId);
+    if (!record || !this.lifecycles.has(taskId)) throw new Error("Task not found.");
+    if (record.status !== TASK_STATES.WAITING_FOR_APPROVAL) {
+      throw new Error("Task requires approval before coding changes can execute.");
+    }
+    const changes = record.result?.proposedChanges;
+    if (!Array.isArray(changes) || changes.length === 0) {
+      throw new Error("No prepared coding changes are available.");
+    }
+    if (!Array.isArray(approvalTokens) || approvalTokens.length !== changes.length ||
+        approvalTokens.some(token => typeof token !== "string" || !token)) {
+      throw new Error("A separate trusted approval token is required for every file change.");
+    }
+    return this.executeTask(taskId, async () => {
+      const results = [];
+      for (let index = 0; index < changes.length; index += 1) {
+        const change = changes[index];
+        const result = await this.executeTool(
+          "workspace.write",
+          change,
+          { approvalToken: approvalTokens[index] }
+        );
+        results.push({ index, path: change.path, result });
+      }
+      return {
+        changesApplied: results.length,
+        verification: "Writes completed; automated test execution is not yet configured.",
+        results
+      };
+    });
+  }
+
   async executeToolSequence(taskId, steps) {
     if (!Array.isArray(steps) || steps.length === 0) {
       throw new Error("Tool sequence must contain at least one step.");
