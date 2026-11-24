@@ -36,3 +36,35 @@ test("vault key must be strong", async () => {
   try { assert.throws(() => new ChatGPTAccountStore({ filePath: path.join(dir, "accounts.json"), masterSecret: "short" }), /at least 32/); }
   finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test("exports and imports an authenticated encrypted credential bundle without exposing tokens", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "chatgpt-transfer-"));
+  try {
+    const passphrase = "long-transfer-passphrase-keep-safe";
+    const source = new ChatGPTAccountStore({filePath:path.join(dir,"source.json"),masterSecret:secret});
+    const original = await source.saveVerifiedAccount(sample("transfer-sub","transfer@example.test"));
+    const bundle = await source.exportCredentialBundle(original.id,passphrase);
+    const serialized = JSON.stringify(bundle);
+    assert.doesNotMatch(serialized,/access-secret|refresh-secret|id-token/);
+    const destination = new ChatGPTAccountStore({filePath:path.join(dir,"destination.json"),masterSecret:secret});
+    const imported = await destination.importCredentialBundle(bundle,passphrase,"urn:uuid:destination-host");
+    const active = await destination.getActiveAccount();
+    assert.equal(imported.email,"transfer@example.test");
+    assert.equal(active.tokens.accessToken,"access-secret-transfer-sub");
+    assert.equal(active.tokens.refreshToken,"refresh-secret");
+    assert.equal(active.extAgentHostId,"urn:uuid:destination-host");
+    await assert.rejects(destination.importCredentialBundle(bundle,"wrong-transfer-passphrase","urn:uuid:destination-host"),/could not be decrypted/);
+    const altered={...bundle,tag:Buffer.alloc(16,7).toString("base64")};
+    await assert.rejects(destination.importCredentialBundle(altered,passphrase,"urn:uuid:destination-host"),/could not be decrypted/);
+  } finally { await rm(dir,{recursive:true,force:true}); }
+});
+
+test("credential transfer requires a long passphrase", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "chatgpt-transfer-pass-"));
+  try {
+    const store = new ChatGPTAccountStore({filePath:path.join(dir,"accounts.json"),masterSecret:secret});
+    const account = await store.saveVerifiedAccount(sample("pass-sub","pass@example.test"));
+    await assert.rejects(store.exportCredentialBundle(account.id,"too-short"),/at least 16/);
+    await assert.rejects(store.importCredentialBundle({}, "too-short", "urn:uuid:host"),/at least 16/);
+  } finally { await rm(dir,{recursive:true,force:true}); }
+});
