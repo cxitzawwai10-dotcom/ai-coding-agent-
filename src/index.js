@@ -68,7 +68,7 @@ if (isMain) {
   const args = process.argv.slice(2);
   if (args.length === 1 && args[0] === "--server") {
     try {
-      const app = createBrowserApp({ browser: { host: process.env.AI_AGENT_HOST || "127.0.0.1", port: Number(process.env.PORT || 8787) } });
+      const app = createBrowserApp({ browser: { host: process.env.AI_AGENT_HOST || "127.0.0.1", port: Number(process.env.PORT || 8787), allowOAuth: process.env.AI_AGENT_ALLOW_OAUTH !== "false" } });
       const address = await app.browser.listen();
       console.log("Browser server listening:", address);
       if (process.env.AI_AGENT_HOST && process.env.AI_AGENT_HOST !== "127.0.0.1") console.warn("ChatGPT plan OAuth sign-in is disabled for remote hosts; the official open-source flow requires a local 127.0.0.1 callback.");
