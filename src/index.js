@@ -1,6 +1,7 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { AgentCore } from "./agent/agent-core.js";
+import { PersistentTaskRegistry } from "./agent/persistent-task-registry.js";
 import { ProjectManager } from "./projects/project-manager.js";
 import { ProjectMemory } from "./memory/project-memory.js";
 import { executeToolWithCliConsent } from "./ui/approval-cli.js";
@@ -9,12 +10,12 @@ export function createAgent({
   workspaceRoot = process.cwd(),
   dataRoot = path.join(workspaceRoot, ".agent-data")
 } = {}) {
-  const agent = new AgentCore();
+  const resolvedDataRoot = path.resolve(dataRoot);
+  const taskRegistry = new PersistentTaskRegistry({ filePath: path.join(resolvedDataRoot, "tasks.json") });
+  const agent = new AgentCore(undefined, taskRegistry);
   const workspace = agent.attachWorkspace(
     path.resolve(workspaceRoot)
   );
-
-  const resolvedDataRoot = path.resolve(dataRoot);
   const projectManager = new ProjectManager({ storePath: path.join(resolvedDataRoot, "projects.json") });
   const projectMemory = new ProjectMemory({ storePath: path.join(resolvedDataRoot, "project-memory.json") });
 
@@ -24,7 +25,8 @@ export function createAgent({
     workspaceRoot: path.resolve(workspaceRoot),
     dataRoot: resolvedDataRoot,
     projectManager,
-    projectMemory
+    projectMemory,
+    taskRegistry
   };
 }
 
