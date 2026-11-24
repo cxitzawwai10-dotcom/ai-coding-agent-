@@ -1,0 +1,31 @@
+[Unit]
+Description=AI Coding Agent browser service
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ai-coding-agent
+Group=ai-coding-agent
+SupplementaryGroups=docker
+WorkingDirectory=/opt/ai-coding-agent
+EnvironmentFile=/opt/ai-coding-agent/.env
+Environment=AI_AGENT_HOST=127.0.0.1
+Environment=AI_AGENT_ALLOW_OAUTH=false
+Environment=PORT=8787
+ExecStart=/usr/bin/node --env-file=.env src/index.js --server
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ai-coding-agent
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
