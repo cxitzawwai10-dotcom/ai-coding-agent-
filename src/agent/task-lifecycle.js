@@ -26,6 +26,16 @@ export class TaskLifecycle {
     this.history = [initialState];
   }
 
+  static restore(states) {
+    if (!Array.isArray(states) || states.length === 0) throw new Error("Invalid persisted task lifecycle.");
+    const lifecycle = new TaskLifecycle(states[0]);
+    for (const nextState of states.slice(1)) {
+      if (nextState === lifecycle.state) continue;
+      lifecycle.transition(nextState);
+    }
+    return lifecycle;
+  }
+
   getState() {
     return this.state;
   }
