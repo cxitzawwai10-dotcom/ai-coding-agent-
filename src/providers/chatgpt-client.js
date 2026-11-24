@@ -14,7 +14,16 @@ function apiFailure(label, response, payload) {
   const detail = (typeof error === "object" ? error?.message : null) || payload?.detail || payload?.message || (typeof error === "string" ? error : "");
   const requestId = response.headers?.get?.("x-request-id");
   const metadata = [code ? "code=" + code : null, requestId ? "request_id=" + requestId : null].filter(Boolean).join(", ");
-  return label + " (HTTP " + response.status + (metadata ? "; " + metadata : "") + ")." + (detail ? " " + String(detail).slice(0, 1000) : "");
+  const hints = {
+    subscription_sharing_user_not_eligible: "This ChatGPT account or workspace is not eligible for plan usage. Choose an eligible account; do not retry the same request.",
+    subscription_sharing_usage_limit_exceeded: "Pause requests using this ChatGPT plan and review ChatGPT Settings → Usage. Do not assume a reset time.",
+    subscription_sharing_usage_unavailable: "Plan usage availability is temporarily unavailable. Preserve credentials and retry later with bounded backoff.",
+    subscription_sharing_unsupported_capability: "The request uses an unsupported capability. Review the error parameter and remove that feature before retrying.",
+    subscription_sharing_route_not_supported: "This request route is not supported for ChatGPT plan usage. Use POST /v1/responses.",
+    subscription_sharing_invalid_user: "The subscriber context could not be validated. Check the selected account and reconnect only if revocation or terminal refresh failure is confirmed."
+  };
+  const hint = hints[code] || (response.status === 503 ? "Temporary service or routing failure; preserve credentials and retry later with bounded backoff." : "");
+  return label + " (HTTP " + response.status + (metadata ? "; " + metadata : "") + ")." + (detail ? " " + String(detail).slice(0, 1000) : "") + (hint ? " " + hint : "");
 }
 
 export class ChatGPTClient {
