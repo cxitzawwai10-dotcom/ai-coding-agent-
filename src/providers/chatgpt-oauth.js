@@ -91,6 +91,36 @@ export class ChatGPTOAuth {
     this.transactions.set(state, { state, nonce, verifier, redirectUri, clientId: existing?.clientId || null, accountId: existing?.id || null, hostId, createdAt: this.clock() });
     return { authorizationUrl: AUTHORIZE_URL + "?" + params.toString(), expiresInSeconds: 600 };
   }
+  async revokeAccount(accountId) {
+    const account = await this.accountStore.getAccountForAuthorization(accountId);
+    if (!account) return { removed: false, remoteRevocationConfirmed: false };
+    let confirmed = false;
+    const refreshToken = account.tokens?.refreshToken;
+    if (refreshToken) {
+      try {
+        const discoveryResponse = await this.fetchImpl(ISSUER + "/.well-known/openid-configuration", { headers: { accept: "application/json" } });
+        if (!discoveryResponse.ok) throw new Error("OpenID discovery failed.");
+        const discovery = await discoveryResponse.json();
+        const endpoint = new URL(discovery.revocation_endpoint);
+        if (endpoint.origin !== ISSUER) throw new Error("OpenAI revocation endpoint was not trusted.");
+        const form = new URLSearchParams({ token: refreshToken, token_type_hint: "refresh_token", client_id: account.clientId });
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const response = await this.fetchImpl(endpoint.href, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, body: form.toString() });
+            if (response.status === 200) { confirmed = true; break; }
+            if (response.status < 500) break;
+          } catch {
+            if (attempt === 2) break;
+          }
+          if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
+        }
+      } catch {
+        confirmed = false;
+      }
+    }
+    await this.accountStore.removeAccount(accountId);
+    return { removed: true, remoteRevocationConfirmed: confirmed };
+  }
   async handleCallback(urlValue) {
     const url = new URL(urlValue);
     const state = url.searchParams.get("state");
