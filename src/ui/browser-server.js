@@ -42,7 +42,7 @@ async function readBody(request,maxBytes=MAX_BODY){
  return parsed;
 }
 
-export function createBrowserServer({agent,projectManager,accountStore,chatgptOAuth,providerClient,codingEngine,token=process.env.AI_AGENT_ACCESS_TOKEN,host="127.0.0.1",port=8787}){
+export function createBrowserServer({agent,projectManager,accountStore,chatgptOAuth,providerClient,codingEngine,token=process.env.AI_AGENT_ACCESS_TOKEN,host="127.0.0.1",port=8787,allowOAuth=host==="127.0.0.1"}){
  if(!agent||typeof token!=="string"||token.length<32)throw new Error("AI_AGENT_ACCESS_TOKEN must be configured with at least 32 characters.");
  const server=http.createServer(async(request,response)=>{
   response.setHeader("x-content-type-options","nosniff");response.setHeader("cache-control","no-store");response.setHeader("referrer-policy","no-referrer");response.setHeader("x-frame-options","DENY");response.setHeader("permissions-policy","camera=(), microphone=(), geolocation=()");response.setHeader("cross-origin-resource-policy","same-origin");
@@ -50,7 +50,7 @@ export function createBrowserServer({agent,projectManager,accountStore,chatgptOA
   if(request.method==="GET"&&url.pathname==="/"){response.writeHead(200,{"content-type":"text/html; charset=utf-8","content-security-policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"});response.end(HTML);return;}
   if(request.method==="GET"&&url.pathname==="/auth/openai/callback"){
    try{
-    if(host!=="127.0.0.1")throw new Error("ChatGPT plan OAuth is available only when the agent is running locally with the official 127.0.0.1 loopback callback.");
+    if(!allowOAuth||host!=="127.0.0.1")throw new Error("ChatGPT plan OAuth is available only when explicitly enabled on the local 127.0.0.1 loopback server.");
     if(!chatgptOAuth)throw new Error("Configure AI_AGENT_VAULT_KEY before connecting ChatGPT.");
     const callbackAddress=server.address();
     if(!callbackAddress||typeof callbackAddress==="string")throw new Error("Local callback listener is not ready.");
@@ -71,7 +71,7 @@ export function createBrowserServer({agent,projectManager,accountStore,chatgptOA
    else if(request.method==="GET"&&url.pathname==="/api/projects")result=await projectManager?.list?.()??[];
    else if(request.method==="GET"&&url.pathname==="/api/chatgpt/accounts")result=await accountStore?.listAccounts?.()??[];
    else if(request.method==="POST"&&url.pathname==="/api/chatgpt/login"){
-    if(host!=="127.0.0.1")throw new Error("Remote-hosted ChatGPT plan OAuth requires OpenAI approval. The official open-source flow requires a local 127.0.0.1 callback.");
+    if(!allowOAuth||host!=="127.0.0.1")throw new Error("ChatGPT plan OAuth is disabled on this server. Complete sign-in locally and import an encrypted credential file.");
     if(!chatgptOAuth)throw new Error("Configure AI_AGENT_VAULT_KEY before connecting ChatGPT.");
     const address=server.address();if(!address||typeof address==="string")throw new Error("Local callback listener is not ready.");
     const body=await readBody(request);
