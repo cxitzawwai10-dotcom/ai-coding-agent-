@@ -84,20 +84,42 @@ export class PersistentTaskRegistry extends TaskRegistry {
 
   create(task) {
     if (this.tasks.size >= MAX_TASKS) throw new Error("Persistent task registry task limit reached.");
+    const previousNextId = this.nextId;
     const record = super.create(task);
-    this.#persist();
-    return record;
+    try {
+      this.#persist();
+      return record;
+    } catch (error) {
+      this.tasks.delete(record.id);
+      this.nextId = previousNextId;
+      throw error;
+    }
   }
 
   update(taskId, updates) {
+    const previous = this.tasks.get(taskId);
+    const snapshot = previous ? structuredClone(previous) : null;
     const record = super.update(taskId, updates);
-    this.#persist();
-    return record;
+    try {
+      this.#persist();
+      return record;
+    } catch (error) {
+      if (snapshot) this.tasks.set(taskId, snapshot);
+      throw error;
+    }
   }
 
   delete(taskId) {
+    const previous = this.tasks.get(taskId);
     const deleted = super.delete(taskId);
-    if (deleted) this.#persist();
+    if (deleted) {
+      try {
+        this.#persist();
+      } catch (error) {
+        this.tasks.set(taskId, previous);
+        throw error;
+      }
+    }
     return deleted;
   }
 }
