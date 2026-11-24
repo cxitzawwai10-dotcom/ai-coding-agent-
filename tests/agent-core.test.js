@@ -366,7 +366,7 @@ test("AgentCore rolls back earlier writes when a later file approval fails", asy
     const agent = new AgentCore();
     agent.attachWorkspace(root);
     const task = await agent.processTask("Update two files transactionally");
-    await agent.inspectTaskWorkspace(task.taskId, ["source.js"]);
+    await agent.inspectTaskWorkspace(task.taskId, ["source.js", "new.txt"]);
     agent.prepareCodingChanges(task.taskId, [
       { path: "source.js", content: "changed" },
       { path: "new.txt", content: "new file" }
@@ -455,6 +455,22 @@ test("AgentCore marks coding execution failed when approved workspace tests fail
     assert.equal(result.status, TASK_STATES.FAILED);
     assert.match(result.error, /Workspace tests failed/);
     assert.equal(await fs.readFile(path.join(root, "source.js"), "utf8"), "export const value = 1;\n");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("AgentCore rejects a coding change for a path that was not inspected", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-coding-uninspected-"));
+  try {
+    const agent = new AgentCore();
+    agent.attachWorkspace(root);
+    const task = await agent.processTask("Write only the inspected file");
+    await agent.inspectTaskWorkspace(task.taskId, ["allowed.txt"], { allowMissing: true });
+    assert.throws(
+      () => agent.prepareCodingChanges(task.taskId, [{ path: "not-inspected.txt", content: "blocked" }]),
+      /only target paths inspected/
+    );
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }
