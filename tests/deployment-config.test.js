@@ -33,6 +33,6 @@ test("Android quickstart documents same-device loopback OAuth and Termux runtime
   const guide = await readFile(new URL("../docs/termux-android-quickstart.md", import.meta.url), "utf8");
   assert.match(guide, /pkg install -y git nodejs npm/);
   assert.match(guide, /127\.0\.0\.1:8787/);
-  assert.match(guide, /same Android phone/);
+  assert.match(guide, /same phone/);
   assert.match(guide, /Docker-based code execution/);
 });
