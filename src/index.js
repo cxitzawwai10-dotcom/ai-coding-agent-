@@ -81,7 +81,16 @@ if (isMain) {
   const agent = startAgent();
   const args = process.argv.slice(2);
   if (args.length > 0) {
-    if (args.length !== 4 || args[0] !== "--tool" || args[2] !== "--input") {
+    if (args.length === 1 && args[0] === "--server") {
+      try {
+        const app = createBrowserApp({ browser: { host: process.env.AI_AGENT_HOST || "127.0.0.1", port: Number(process.env.PORT || 8787) } });
+        const address = await app.browser.listen();
+        console.log("Browser server listening:", address);
+      } catch (error) {
+        console.error("SERVER ERROR:", error instanceof Error ? error.message : String(error));
+        process.exitCode = 1;
+      }
+    } else if (args.length !== 4 || args[0] !== "--tool" || args[2] !== "--input") {
       console.error("Usage: node src/index.js --tool <tool-id> --input '<json>'");
       process.exitCode = 2;
     } else {
