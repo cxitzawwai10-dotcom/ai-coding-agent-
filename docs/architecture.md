@@ -8,7 +8,7 @@ It must support Burmese conversations, project management, code editing, debuggi
 - **Agent Core:** Understand tasks, plan, coordinate tools, and report verified results.
 - **Project Manager:** Create, list, inspect, update, and remove project metadata. Project workspace roots remain separate; removing a project record never deletes its workspace files.
 - **Project Memory:** Persist project-scoped notes, decisions, tasks, tags, and searchable context across restarts.
-- **Persistent Storage:** Atomic JSON writes, bounded storage, symlink rejection, schema validation, and serialized in-process writes.
+- **Persistent Storage:** Atomic JSON persistence for project records, project memory, and task histories; bounded files, symlink rejection, schema validation, and single-writer deployment boundaries. Interrupted executing tasks are marked failed during restart recovery.
 - **Account Manager (Phase 4):** User-configurable provider accounts with official authentication and no quota evasion.
 - **Backup and Recovery:** Preserve backups and require authorization for destructive recovery.
 - **Workspace Inspection and Approved Coding:** Inspect files, prepare bounded proposals, require per-file approval, and rollback failed transactions.
@@ -20,10 +20,12 @@ It must support Burmese conversations, project management, code editing, debuggi
 ## 3. Persistent Data
 The agent factory exposes `projectManager` and `projectMemory`. By default they use the workspace-local `.agent-data/` directory, which is excluded from Git. A deployment may pass a separate `dataRoot` to `createAgent`.
 - `projects.json`: project metadata only; no workspace contents are copied or deleted.
+- `project-memory.json`: project-scoped notes, decisions, task notes, and tags.
+- `tasks.json`: task descriptions, plans/results, status history, and lifecycle recovery data. Tasks interrupted in EXECUTING state are marked FAILED on restart; they are never automatically resumed.
 - `project-memory.json`: project-scoped memory records, tags, type, and timestamps.
 - Storage is bounded to 5 MiB per JSON store and memory entries are bounded by count and content size.
 - Persistent records are validated when loaded. Invalid JSON/schema fails closed rather than silently resetting user data.
-- Writes use a temporary file, fsync, and atomic rename. The implementation serializes writes within a process; deployments with multiple server processes must use a transactional shared database before enabling concurrent multi-instance writes.
+- Writes use temporary files, fsync, and atomic rename. Run one active agent process per `dataRoot`; deployments with multiple server processes must use a transactional shared database before enabling concurrent multi-instance writes.
 
 ## 4. Security Principles
 - Never hardcode API keys, passwords, or tokens.
