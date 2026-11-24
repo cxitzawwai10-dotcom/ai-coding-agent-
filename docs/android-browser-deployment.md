@@ -29,6 +29,22 @@ Never commit secrets or OAuth credentials. Do not put tokens in project memory, 
 ## Remote hosting
 Do not deploy this open-source loopback OAuth path as a remote web login. For a self-hosted VM, the supported pattern is local OAuth followed by secure credential transfer, with the VM's host ID preserved; the transfer bridge is still pending in this repository. For a paid or remotely hosted product outside that VM workflow, first obtain OpenAI approval through the documented interest process and implement the exact approved redirect/client model.
 
+
+## Android-to-self-hosted-VM credential transfer
+
+The browser app now supports an encrypted transfer file for the documented self-hosted-VM pattern:
+
+1. Run this same open-source app locally on the Android device (for example, through a local Node.js runtime) and open its 127.0.0.1 browser page.
+2. Sign in to ChatGPT locally and grant plan-usage permission where eligible.
+3. Select the connected account, enter a strong transfer passphrase (at least 16 characters), and export the encrypted credential file.
+4. Transfer the encrypted file to the self-hosted VM over a secure channel. Transfer the passphrase separately; never send either in a public chat or commit them to Git.
+5. On the VM's browser page, use the same app's Import Credential File control and enter the passphrase. The VM creates/preserves its own stable host ID and re-encrypts credentials under its own AI_AGENT_VAULT_KEY.
+6. Confirm the model list and a small inference request on the VM before using the coding agent.
+
+The transfer bundle uses scrypt plus AES-256-GCM authenticated encryption. It contains the selected registration's issued client ID, validated account identity, granted scopes, and tokens. It does not contain the source host ID or either installation's vault key. Do not reuse a transfer file after you no longer need it; delete temporary copies securely. A transfer bundle is a bearer credential while its passphrase is known.
+
+This removes the need for a remote browser callback, but it does not eliminate the initial local sign-in step or the user's need to move the encrypted file and passphrase to the VM. The app has not yet been tested end-to-end on an actual Android device.
+
 ## Release checks
 - Run CI and inspect every job result.
 - Verify the OAuth callback on the same local device that launched authorization.
