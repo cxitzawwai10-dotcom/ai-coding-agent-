@@ -1,12 +1,12 @@
 # Phase 3 Status — Persistent Project Memory & Project Management
 
 ## Implemented
-- Bounded JSON persistence layer with atomic temporary-file writes, fsync, atomic rename, symlink rejection, corrupt-data fail-closed behavior, and serialized writes within one process.
+- Bounded JSON persistence layer with atomic temporary-file writes, fsync, atomic rename, symlink rejection, corrupt-data fail-closed behavior, and serialized writes per service instance.
 - Project Manager: create, list, get, update name/description, and remove metadata records.
 - Project metadata stores stable IDs, canonical absolute workspace roots, descriptions, and timestamps.
 - Duplicate workspace roots are rejected. Removing a project removes only its metadata record and never recursively deletes workspace files.
 - Project Memory: project-scoped notes/decisions/tasks, tags, timestamps, bounded content, list/filter, text/tag/type search, individual removal, and project memory clear.
-- Project and memory services are exposed from `createAgent()`; callers can configure `dataRoot`.
+- Project, memory, and persistent task registry services are exposed from `createAgent()`; callers can configure `dataRoot`.
 - Default runtime data directory is `.agent-data/`, excluded from Git.
 - Persistent task registry saves task records, plans/results, status transitions, and history across restarts. The agent restores task lifecycles on startup and marks tasks interrupted in EXECUTING state as FAILED instead of silently resuming unsafe work.
 - Automated tests cover persistence across service restarts, CRUD, isolation between projects, task lifecycle recovery, validation, limits, corrupt JSON, and concurrent writes.
@@ -20,7 +20,7 @@
 - In-flight tasks are never resumed automatically after restart. Tasks found in `EXECUTING` state are marked `FAILED` with an interruption reason; inspect and retry deliberately.
 
 ## Verified GitHub Actions results
-- CI run [45365646261](https://github.com/cxitzawwai10-dotcom/ai-coding-agent-/actions/runs/45366324953): successful.
+- CI run [45366324953](https://github.com/cxitzawwai10-dotcom/ai-coding-agent-/actions/runs/45366324953): successful.
 - Node.js 24 suite: **103 tests, 102 passed, 0 failed, 1 intentionally skipped** (the real Docker integration test runs in its own job).
 - Docker sandbox integration: **1 passed, 0 failed**.
 - Phase 2 Security Tests workflow for the same implementation commit ([run 45366324935](https://github.com/cxitzawwai10-dotcom/ai-coding-agent-/actions/runs/45366324935)): successful; its Node.js suite also reported 102 passed, 0 failed, 1 skipped.
