@@ -114,10 +114,10 @@ test("parses CRLF server-sent events even when line endings are split across chu
     if(url.endsWith("/models"))return {ok:true,json:async()=>({models:[{visibility:"list",slug:"crlf-model",display_name:"CRLF Model"}]})};
     if(url.endsWith("/responses"))return {ok:true,body:new ReadableStream({start(controller){
       const encoder=new TextEncoder();
-      controller.enqueue(encoder.encode('data: {"type":"response.output_text.delta","delta":"split"}\\r'));
-      controller.enqueue(encoder.encode('\\n\\r'));
-      controller.enqueue(encoder.encode('\\ndata: {"type":"response.completed"}\\r'));
-      controller.enqueue(encoder.encode('\\n\\r\\n'));
+      controller.enqueue(encoder.encode('data: {"type":"response.output_text.delta","delta":"split"}\r'));
+      controller.enqueue(encoder.encode('\n\r'));
+      controller.enqueue(encoder.encode('\ndata: {"type":"response.completed"}\r'));
+      controller.enqueue(encoder.encode('\n\r\n'));
       controller.close();
     }})};
     throw new Error("Unexpected URL");
