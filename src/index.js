@@ -32,7 +32,7 @@ export async function runToolCommand(agent, id, inputJson, io = {}) {
 
   const result = await executeToolWithCliConsent(agent, id, input, io);
   const output = io.stdout ?? process.stdout;
-  output.write(`RESULT: ${JSON.stringify(result)}\\n`);
+  output.write(`RESULT: ${JSON.stringify(result)}\n`);
   return result;
 }
 
