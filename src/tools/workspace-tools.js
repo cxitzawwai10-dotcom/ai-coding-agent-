@@ -107,6 +107,42 @@ export class WorkspaceTools {
     }
   }
 
+  async capture(relativePath) {
+    const { target } = await this.resolveParent(relativePath);
+    try {
+      const st = await fs.lstat(target);
+      if (st.isSymbolicLink() || !st.isFile()) {
+        throw new Error("Transaction target must be a regular file.");
+      }
+      return { path: relativePath, existed: true, content: await this.read(relativePath) };
+    } catch (error) {
+      if (error.code === "ENOENT") return { path: relativePath, existed: false };
+      throw error;
+    }
+  }
+
+  async restore(snapshot) {
+    if (!snapshot || typeof snapshot.path !== "string" || typeof snapshot.existed !== "boolean") {
+      throw new Error("Invalid workspace snapshot.");
+    }
+    if (snapshot.existed) {
+      await this.write(snapshot.path, snapshot.content);
+      return { path: snapshot.path, restored: true };
+    }
+    const { target } = await this.resolveParent(snapshot.path);
+    try {
+      const st = await fs.lstat(target);
+      if (st.isSymbolicLink() || !st.isFile()) {
+        throw new Error("Cannot roll back a target that is no longer a regular file.");
+      }
+      await fs.unlink(target);
+      return { path: snapshot.path, removed: true };
+    } catch (error) {
+      if (error.code === "ENOENT") return { path: snapshot.path, removed: true };
+      throw error;
+    }
+  }
+
   async write(relativePath, content) {
     if (typeof content !== "string" || Buffer.byteLength(content) > MAX_BYTES) throw new Error("Invalid content or file exceeds 1 MB.");
     const { root, target, parent } = await this.resolveParent(relativePath);
