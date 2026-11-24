@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 export class ToolRegistry {
   constructor(approvalVerifier = null) {
     this.tools = new Map();
@@ -13,13 +15,17 @@ export class ToolRegistry {
     if (typeof execute !== "function") throw new Error("Tool execute function is required.");
     if (typeof requiresApproval !== "boolean") throw new Error("Invalid approval setting.");
     if (validateInput !== undefined && typeof validateInput !== "function") throw new Error("Invalid input validator.");
-    this.tools.set(id, Object.freeze({ id, description: description.trim(), execute, requiresApproval, validateInput }));
+    this.tools.set(id, Object.freeze({ id, description: description.trim(), execute, requiresApproval, validateInput, registrationId: randomBytes(16).toString("hex") }));
     return this.get(id);
   }
 
   get(id) {
     const tool = this.tools.get(id);
     return tool ? { id: tool.id, description: tool.description, requiresApproval: tool.requiresApproval } : null;
+  }
+
+  getApprovalBinding(id) {
+    return this.tools.get(id)?.registrationId ?? null;
   }
 
   list() {
@@ -34,7 +40,7 @@ export class ToolRegistry {
     const tool = this.tools.get(id);
     if (!tool) throw new Error("Tool not found.");
     if (!options || typeof options !== "object" || Array.isArray(options)) throw new Error("Invalid execution options.");
-    if (tool.requiresApproval && (!this.approvalVerifier || await this.approvalVerifier(id, input, options) !== true)) {
+    if (tool.requiresApproval && (!this.approvalVerifier || await this.approvalVerifier(id, input, options, tool.registrationId) !== true)) {
       throw new Error("Trusted approval is required.");
     }
     if (tool.validateInput && await tool.validateInput(input) !== true) throw new Error("Tool input validation failed.");
