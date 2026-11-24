@@ -39,7 +39,7 @@ The browser app now supports an encrypted transfer file for the documented self-
 2. Sign in to ChatGPT locally and grant plan-usage permission where eligible.
 3. Select the connected account, enter a strong transfer passphrase (at least 16 characters), and export the encrypted credential file.
 4. Transfer the encrypted file to the self-hosted VM over a secure channel. Transfer the passphrase separately; never send either in a public chat or commit them to Git.
-5. On the VM's browser page, use the same app's Import Credential File control and enter the passphrase. The VM creates/preserves its own stable host ID and re-encrypts credentials under its own AI_AGENT_VAULT_KEY.
+5. On the VM's HTTPS browser page, use the same app's Import Credential File control and enter the passphrase. Keep the app bound to 127.0.0.1 behind Caddy (or another trusted TLS proxy) and set AI_AGENT_ALLOW_OAUTH=false. The VM creates/preserves its own stable host ID and re-encrypts credentials under its own AI_AGENT_VAULT_KEY.
 6. Confirm the model list and a small inference request on the VM before using the coding agent.
 
 The transfer bundle uses scrypt plus AES-256-GCM authenticated encryption. It contains the selected registration's issued client ID, validated account identity, granted scopes, and tokens. It does not contain the source host ID or either installation's vault key. Do not reuse a transfer file after you no longer need it; delete temporary copies securely. A transfer bundle is a bearer credential while its passphrase is known.
