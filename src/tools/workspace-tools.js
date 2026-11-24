@@ -42,6 +42,10 @@ export class WorkspaceTools {
     return real;
   }
 
+  sameFile(left, right) {
+    return left.dev === right.dev && left.ino === right.ino;
+  }
+
   async list(relativePath = ".") {
     const root = await this.realRoot();
     let target = root;
@@ -65,10 +69,13 @@ export class WorkspaceTools {
 
   async read(relativePath) {
     const target = await this.resolveFile(relativePath);
+    const before = await fs.lstat(target);
+    if (before.isSymbolicLink() || !before.isFile()) throw new Error("Target changed before read.");
     const handle = await fs.open(target, constants.O_RDONLY | NOFOLLOW);
     try {
       const st = await handle.stat();
-      if (!st.isFile() || st.size > MAX_BYTES) throw new Error("File is not readable or exceeds 1 MB.");
+      if (!st.isFile() || !this.sameFile(before, st)) throw new Error("File changed while opening for read.");
+      if (st.size > MAX_BYTES) throw new Error("File is not readable or exceeds 1 MB.");
       const chunks = [];
       let total = 0;
       const buffer = Buffer.alloc(64 * 1024);
@@ -110,7 +117,8 @@ export class WorkspaceTools {
       if (st.isSymbolicLink()) throw new Error("Symbolic-link write targets are not allowed.");
       if (!st.isFile()) throw new Error("Target is not a regular file.");
       source = await fs.open(target, constants.O_RDONLY | NOFOLLOW);
-      if (!(await source.stat()).isFile()) throw new Error("Target is not a regular file.");
+      const opened = await source.stat();
+      if (!opened.isFile() || !this.sameFile(st, opened)) throw new Error("Write target changed while opening.");
       existed = true;
     } catch (error) {
       if (error.code !== "ENOENT") { if (source) await source.close(); throw error; }
@@ -147,12 +155,17 @@ export class WorkspaceTools {
       if (await fs.realpath(parent) !== parent || !this.isInside(parent)) throw new Error("Workspace parent changed before commit.");
       if (existed) {
         const latest = await fs.lstat(target);
-        if (latest.isSymbolicLink() || !latest.isFile()) throw new Error("Write target changed during operation.");
+        const original = await source.stat();
+        if (latest.isSymbolicLink() || !latest.isFile() || !this.sameFile(latest, original)) {
+          throw new Error("Write target changed during operation.");
+        }
+        await fs.rename(tempPath, target);
       } else {
-        try { await fs.lstat(target); throw new Error("Write target appeared during operation."); }
-        catch (error) { if (error.code !== "ENOENT") throw error; }
+        // link() publishes the completed temporary file without overwriting a
+        // target created concurrently after the earlier existence check.
+        await fs.link(tempPath, target);
+        await fs.unlink(tempPath);
       }
-      await fs.rename(tempPath, target);
       tempPath = null;
       return { path: relativePath, written: true };
     } finally {
