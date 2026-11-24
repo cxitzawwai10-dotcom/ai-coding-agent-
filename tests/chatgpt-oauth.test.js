@@ -27,6 +27,7 @@ test("builds the documented loopback OAuth authorization request with PKCE and a
     assert.equal(url.searchParams.get("code_challenge_method"),"S256");
     assert.match(url.searchParams.get("scope"),/chatgpt.tokens.use.direct/);
     await assert.rejects(oauth.beginLogin({redirectUri:"https://example.test/auth/callback"}),/127.0.0.1 loopback/);
+    await assert.rejects(oauth.beginLogin({redirectUri:"http://127.0.0.1:1455/auth/openai/callback"}),/127.0.0.1 loopback/);
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
 
