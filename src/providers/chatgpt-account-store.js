@@ -135,7 +135,7 @@ export class ChatGPTAccountStore {
     const payload = {
       version: 1,
       account: {
-        issuer: account.issuer,
+        issuer: "https://auth.openai.com",
         subject: account.subject,
         clientId: account.clientId,
         email: account.email,
