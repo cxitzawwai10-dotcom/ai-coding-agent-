@@ -19,5 +19,8 @@
 ## Phase 6 — Android browser interface and integration
 - Added a responsive Burmese-first browser UI for ChatGPT account connection, account listing/switching, model selection, proposal review, and apply-and-test.
 - The local OAuth callback is handled only by the loopback-bound server. Remote-host mode returns a clear limitation instead of pretending login worked.
+- Added passphrase-encrypted credential export/import (scrypt + AES-256-GCM) to support OpenAI's self-hosted-VM transfer workflow. Import binds the account to the destination host's stable ID and re-encrypts credentials with the destination vault key.
+- Model discovery and inference now bind to an account snapshot; account switches abort model and Responses requests and prevent stale model results from replacing the selected account's catalog.
+- Coding changes are restricted to inspected paths at the AgentCore boundary, and the approval preview now includes complete file contents under a 2 MiB total review limit.
 - npm start launches the browser server; the default listener is 127.0.0.1:8787.
-- **Not complete:** no cloud host, OpenAI remote-host approval, Android-native local callback bridge, TLS reverse proxy, or device end-to-end deployment has been provisioned or verified. GitHub CI cannot establish these external release conditions.
+- **Not complete:** no Android-device end-to-end sign-in/transfer test, cloud host provisioning, TLS reverse proxy, or user-device deployment has been verified. The encrypted self-hosted-VM transfer flow is implemented but still needs a real Android local sign-in and remote VM test. Commercial/remote-hosted use outside OpenAI's documented self-hosted-VM flow still requires OpenAI approval. GitHub CI cannot establish these external release conditions.
