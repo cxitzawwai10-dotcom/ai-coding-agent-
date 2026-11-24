@@ -26,12 +26,26 @@ $('refreshStatus').onclick=async()=>{try{show(await api('status'))}catch(e){show
 </script></html>`;
 
 function safeEqual(a,b){const x=Buffer.from(a||"");const y=Buffer.from(b||"");return x.length===y.length&&timingSafeEqual(x,y);}
-async function readBody(request,maxBytes=MAX_BODY){let body="";for await(const chunk of request){body+=chunk;if(Buffer.byteLength(body)>maxBytes)throw new Error("Request body too large.");}if(!body)return {};const parsed=JSON.parse(body);if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw new Error("JSON body must be an object.");return parsed;}
+async function readBody(request,maxBytes=MAX_BODY){
+ const contentType=String(request.headers["content-type"]||"").split(";",1)[0].trim().toLowerCase();
+ if(contentType!=="application/json")throw new Error("Content-Type must be application/json.");
+ const chunks=[];let total=0;
+ for await(const chunk of request){
+  const bytes=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);
+  total+=bytes.length;
+  if(total>maxBytes)throw new Error("Request body too large.");
+  chunks.push(bytes);
+ }
+ if(!total)return {};
+ let parsed;try{parsed=JSON.parse(Buffer.concat(chunks,total).toString("utf8"));}catch{throw new Error("Request body must contain valid JSON.");}
+ if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw new Error("JSON body must be an object.");
+ return parsed;
+}
 
 export function createBrowserServer({agent,projectManager,accountStore,chatgptOAuth,providerClient,codingEngine,token=process.env.AI_AGENT_ACCESS_TOKEN,host="127.0.0.1",port=8787}){
  if(!agent||typeof token!=="string"||token.length<32)throw new Error("AI_AGENT_ACCESS_TOKEN must be configured with at least 32 characters.");
  const server=http.createServer(async(request,response)=>{
-  response.setHeader("x-content-type-options","nosniff");response.setHeader("cache-control","no-store");response.setHeader("referrer-policy","no-referrer");
+  response.setHeader("x-content-type-options","nosniff");response.setHeader("cache-control","no-store");response.setHeader("referrer-policy","no-referrer");response.setHeader("x-frame-options","DENY");response.setHeader("permissions-policy","camera=(), microphone=(), geolocation=()");response.setHeader("cross-origin-resource-policy","same-origin");
   const url=new URL(request.url,"http://localhost");
   if(request.method==="GET"&&url.pathname==="/"){response.writeHead(200,{"content-type":"text/html; charset=utf-8","content-security-policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"});response.end(HTML);return;}
   if(request.method==="GET"&&url.pathname==="/auth/openai/callback"){
