@@ -256,6 +256,41 @@ export class AgentCore {
 
 
 
+
+  async inspectTaskWorkspace(taskId, paths) {
+    const record = this.registry.get(taskId);
+    if (!record || !this.lifecycles.has(taskId)) {
+      throw new Error("Task not found.");
+    }
+    if (record.status !== TASK_STATES.PLANNED) {
+      throw new Error("Workspace inspection is only allowed for planned tasks.");
+    }
+    if (!Array.isArray(paths) || paths.length === 0 || paths.length > 20) {
+      throw new Error("Workspace inspection requires between 1 and 20 file paths.");
+    }
+    if (paths.some(filePath => typeof filePath !== "string" || !filePath.trim()) ||
+        new Set(paths).size !== paths.length) {
+      throw new Error("Workspace inspection paths must be unique non-empty strings.");
+    }
+    if (!this.toolRegistry.get("workspace.read")) {
+      throw new Error("Workspace read tool is not registered.");
+    }
+
+    const files = [];
+    for (const filePath of paths) {
+      const content = await this.executeTool("workspace.read", { path: filePath });
+      files.push({ path: filePath, content });
+    }
+
+    const plan = record.result && typeof record.result === "object"
+      ? record.result
+      : { task: record.task, status: TASK_STATES.PLANNED, steps: [] };
+    this.registry.update(taskId, {
+      result: { ...plan, workspaceInspection: files }
+    });
+    return { taskId, inspectedFiles: files.length, files };
+  }
+
   async executeToolSequence(taskId, steps) {
     if (!Array.isArray(steps) || steps.length === 0) {
       throw new Error("Tool sequence must contain at least one step.");
