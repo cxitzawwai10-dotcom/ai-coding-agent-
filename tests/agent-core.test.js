@@ -395,7 +395,7 @@ test("AgentCore runs Node workspace tests only with trusted approval after codin
       'import test from "node:test";\nimport assert from "node:assert/strict";\nimport { value } from "./source.js";\ntest("updated source value", () => assert.equal(value, 2));\n'
     );
     const agent = new AgentCore();
-    agent.attachWorkspace(root);
+    agent.attachWorkspace(root, { testRunner: { run: async () => ({ passed: true, exitCode: 0, timedOut: false, stdout: "tests passed", stderr: "", sandbox: "test-double" }) } });
     const task = await agent.processTask("Update source and run tests");
     await agent.inspectTaskWorkspace(task.taskId, ["source.js", "source.test.js"]);
     agent.prepareCodingChanges(task.taskId, [
@@ -437,7 +437,7 @@ test("AgentCore marks coding execution failed when approved workspace tests fail
       'import test from "node:test";\nimport assert from "node:assert/strict";\nimport { value } from "./source.js";\ntest("expected value", () => assert.equal(value, 99));\n'
     );
     const agent = new AgentCore();
-    agent.attachWorkspace(root);
+    agent.attachWorkspace(root, { testRunner: { run: async () => ({ passed: false, exitCode: 1, timedOut: false, stdout: "expected failure", stderr: "", sandbox: "test-double", error: "Sandboxed tests failed." }) } });
     const task = await agent.processTask("Run failing project tests");
     await agent.inspectTaskWorkspace(task.taskId, ["source.js", "source.test.js"]);
     agent.prepareCodingChanges(task.taskId, [
