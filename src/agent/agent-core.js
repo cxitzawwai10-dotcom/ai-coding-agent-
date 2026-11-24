@@ -296,8 +296,10 @@ export class AgentCore {
 
     const files = [];
     for (const filePath of paths) {
-      const content = await this.executeTool("workspace.read", { path: filePath });
-      files.push({ path: filePath, content });
+      const snapshot = await this.workspaceTools.capture(filePath);
+      files.push(snapshot.existed
+        ? { path: filePath, exists: true, content: snapshot.content }
+        : { path: filePath, exists: false, content: null });
     }
 
     const plan = record.result && typeof record.result === "object"
