@@ -5,7 +5,7 @@ import { PersistentTaskRegistry } from "./agent/persistent-task-registry.js";
 import { ProjectManager } from "./projects/project-manager.js";
 import { ProjectMemory } from "./memory/project-memory.js";
 import { executeToolWithCliConsent } from "./ui/approval-cli.js";
-import { AccountVault, ProviderClient } from "./providers/index.js";
+import { ChatGPTAccountStore, ChatGPTOAuth, ChatGPTClient } from "./providers/index.js";
 import { AutonomousCodingEngine } from "./agent/autonomous-coding-engine.js";
 import { createBrowserServer } from "./ui/browser-server.js";
 
@@ -17,12 +17,15 @@ export function createAgent({ workspaceRoot = process.cwd(), dataRoot = path.joi
   const workspace = agent.attachWorkspace(resolvedWorkspaceRoot);
   const projectManager = new ProjectManager({ storePath: path.join(resolvedDataRoot, "projects.json") });
   const projectMemory = new ProjectMemory({ storePath: path.join(resolvedDataRoot, "project-memory.json") });
-  const accountVault = process.env.AI_AGENT_VAULT_KEY
-    ? new AccountVault({ filePath: path.join(resolvedDataRoot, "accounts.json") })
+  const accountStore = process.env.AI_AGENT_VAULT_KEY
+    ? new ChatGPTAccountStore({ filePath: path.join(resolvedDataRoot, "chatgpt-accounts.json") })
     : null;
-  const providerClient = accountVault ? new ProviderClient({ accountVault }) : null;
+  const chatgptOAuth = accountStore
+    ? new ChatGPTOAuth({ accountStore, hostIdPath: path.join(resolvedDataRoot, "chatgpt-host.json") })
+    : null;
+  const providerClient = accountStore ? new ChatGPTClient({ accountStore }) : null;
   const codingEngine = providerClient ? new AutonomousCodingEngine({ agent, providerClient }) : null;
-  return { agent, workspace, workspaceRoot: resolvedWorkspaceRoot, dataRoot: resolvedDataRoot, projectManager, projectMemory, taskRegistry, accountVault, providerClient, codingEngine };
+  return { agent, workspace, workspaceRoot: resolvedWorkspaceRoot, dataRoot: resolvedDataRoot, projectManager, projectMemory, taskRegistry, accountStore, chatgptOAuth, providerClient, codingEngine };
 }
 
 export function createBrowserApp(options = {}) {
@@ -30,7 +33,9 @@ export function createBrowserApp(options = {}) {
   const browser = createBrowserServer({
     agent: services.agent,
     projectManager: services.projectManager,
-    accountVault: services.accountVault,
+    accountStore: services.accountStore,
+    chatgptOAuth: services.chatgptOAuth,
+    providerClient: services.providerClient,
     codingEngine: services.codingEngine,
     ...(options.browser ?? {})
   });
@@ -43,7 +48,7 @@ export async function runToolCommand(agent, id, inputJson, io = {}) {
   try { input = JSON.parse(inputJson); } catch { throw new Error("Invalid JSON supplied for tool input."); }
   const result = await executeToolWithCliConsent(agent, id, input, io);
   const output = io.stdout ?? process.stdout;
-  output.write(`RESULT: ${JSON.stringify(result)}\n`);
+  output.write(`RESULT: ${JSON.stringify(result)}\\n`);
   return result;
 }
 
@@ -66,6 +71,7 @@ if (isMain) {
       const app = createBrowserApp({ browser: { host: process.env.AI_AGENT_HOST || "127.0.0.1", port: Number(process.env.PORT || 8787) } });
       const address = await app.browser.listen();
       console.log("Browser server listening:", address);
+      if (process.env.AI_AGENT_HOST && process.env.AI_AGENT_HOST !== "127.0.0.1") console.warn("ChatGPT plan OAuth sign-in is disabled for remote hosts; the official open-source flow requires a local 127.0.0.1 callback.");
     } catch (error) {
       console.error("SERVER ERROR:", error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
