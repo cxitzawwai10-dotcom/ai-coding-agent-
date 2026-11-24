@@ -92,3 +92,36 @@ test("never sends a request using the previous account after a switch during tok
   release();
   await assert.rejects(pending,/account changed/);
 });
+
+test("preserves direct-admission error detail, request ID and plan-usage recovery guidance", async () => {
+  const account={id:"limited",clientId:"oaiapp_limited",scopes:["chatgpt.tokens.use.direct"],expiresAt:new Date(Date.now()+3600000).toISOString(),tokens:{accessToken:"limited-token"}};
+  const client=new ChatGPTClient({accountStore:{async getActiveAccount(){return account;}},fetchImpl:async()=>({
+    ok:false,status:429,headers:{get(name){return name==="x-request-id"?"req_test_123":null;}},
+    async text(){return JSON.stringify({detail:"Plan usage limit reached.",error:{code:"subscription_sharing_usage_limit_exceeded"}});}
+  })});
+  await assert.rejects(client.listModels(),error=>{
+    assert.match(error.message,/HTTP 429/);
+    assert.match(error.message,/subscription_sharing_usage_limit_exceeded/);
+    assert.match(error.message,/req_test_123/);
+    assert.match(error.message,/ChatGPT Settings/);
+    return true;
+  });
+});
+
+test("parses CRLF server-sent events even when line endings are split across chunks", async () => {
+  const account={id:"crlf",clientId:"oaiapp_crlf",scopes:["chatgpt.tokens.use.direct"],expiresAt:new Date(Date.now()+3600000).toISOString(),tokens:{accessToken:"crlf-token"}};
+  const client=new ChatGPTClient({accountStore:{async getActiveAccount(){return account;}},fetchImpl:async(url)=>{
+    if(url.endsWith("/models"))return {ok:true,json:async()=>({models:[{visibility:"list",slug:"crlf-model",display_name:"CRLF Model"}]})};
+    if(url.endsWith("/responses"))return {ok:true,body:new ReadableStream({start(controller){
+      const encoder=new TextEncoder();
+      controller.enqueue(encoder.encode('data: {"type":"response.output_text.delta","delta":"split"}\\r'));
+      controller.enqueue(encoder.encode('\\n\\r'));
+      controller.enqueue(encoder.encode('\\ndata: {"type":"response.completed"}\\r'));
+      controller.enqueue(encoder.encode('\\n\\r\\n'));
+      controller.close();
+    }})};
+    throw new Error("Unexpected URL");
+  }});
+  const result=await client.generate({prompt:"test",model:"crlf-model"});
+  assert.equal(result.text,"split");
+});
