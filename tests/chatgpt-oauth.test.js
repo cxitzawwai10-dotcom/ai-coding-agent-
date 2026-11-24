@@ -19,14 +19,14 @@ test("builds the documented loopback OAuth authorization request with PKCE and a
   try {
     const accountStore = { async listAccounts(){return [];} };
     const oauth = new ChatGPTOAuth({accountStore,hostIdPath:path.join(dir,"host.json"),fetchImpl:async()=>{throw new Error("not called");}});
-    const result = await oauth.beginLogin({redirectUri:"http://127.0.0.1:1455/auth/openai/callback"});
+    const result = await oauth.beginLogin({redirectUri:"http://127.0.0.1:1455/auth/callback"});
     const url = new URL(result.authorizationUrl);
     assert.equal(url.origin,"https://auth.openai.com");
     assert.equal(url.searchParams.get("client_id"),"dynamic_agent_client");
-    assert.equal(url.searchParams.get("redirect_uri"),"http://127.0.0.1:1455/auth/openai/callback");
+    assert.equal(url.searchParams.get("redirect_uri"),"http://127.0.0.1:1455/auth/callback");
     assert.equal(url.searchParams.get("code_challenge_method"),"S256");
     assert.match(url.searchParams.get("scope"),/chatgpt.tokens.use.direct/);
-    await assert.rejects(oauth.beginLogin({redirectUri:"https://example.test/auth/openai/callback"}),/127.0.0.1 loopback/);
+    await assert.rejects(oauth.beginLogin({redirectUri:"https://example.test/auth/callback"}),/127.0.0.1 loopback/);
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
 
@@ -51,13 +51,13 @@ test("validates the OAuth state, issued client ID, ID-token signature, nonce and
     };
     let nonce;
     const oauth = new ChatGPTOAuth({accountStore,hostIdPath:path.join(dir,"host.json"),fetchImpl});
-    const start = await oauth.beginLogin({redirectUri:"http://127.0.0.1:1455/auth/openai/callback"});
+    const start = await oauth.beginLogin({redirectUri:"http://127.0.0.1:1455/auth/callback"});
     const auth = new URL(start.authorizationUrl);
     nonce = auth.searchParams.get("nonce");
     const state = auth.searchParams.get("state");
-    await assert.rejects(oauth.handleCallback("http://127.0.0.1:1455/auth/openai/callback?code=bad&client_id=oaiapp_issued123&state=wrong"),/state is invalid/);
-    await assert.rejects(oauth.handleCallback("http://127.0.0.1:1456/auth/openai/callback?code=bad&client_id=oaiapp_issued123&state="+encodeURIComponent(state)),/does not match/);
-    const account = await oauth.handleCallback("http://127.0.0.1:1455/auth/openai/callback?code=valid&client_id=oaiapp_issued123&state="+encodeURIComponent(state));
+    await assert.rejects(oauth.handleCallback("http://127.0.0.1:1455/auth/callback?code=bad&client_id=oaiapp_issued123&state=wrong"),/state is invalid/);
+    await assert.rejects(oauth.handleCallback("http://127.0.0.1:1456/auth/callback?code=bad&client_id=oaiapp_issued123&state="+encodeURIComponent(state)),/does not match/);
+    const account = await oauth.handleCallback("http://127.0.0.1:1455/auth/callback?code=valid&client_id=oaiapp_issued123&state="+encodeURIComponent(state));
     assert.equal(account.id,"stored-account");
     assert.equal(saved.subject,"account-subject");
     assert.equal(saved.clientId,"oaiapp_issued123");
@@ -107,10 +107,10 @@ test("rejects ID tokens with missing issued-at, malformed not-before, or excessi
         throw new Error("Unexpected OAuth URL");
       };
       const oauth = new ChatGPTOAuth({ accountStore, hostIdPath: path.join(dir, scenario.name.replaceAll(" ", "-") + ".json"), fetchImpl });
-      const start = await oauth.beginLogin({ redirectUri: "http://127.0.0.1:1455/auth/openai/callback" });
+      const start = await oauth.beginLogin({ redirectUri: "http://127.0.0.1:1455/auth/callback" });
       const auth = new URL(start.authorizationUrl);
       currentToken = scenario.make(auth.searchParams.get("nonce"));
-      const callback = "http://127.0.0.1:1455/auth/openai/callback?code=valid&client_id=oaiapp_claims&state=" + encodeURIComponent(auth.searchParams.get("state"));
+      const callback = "http://127.0.0.1:1455/auth/callback?code=valid&client_id=oaiapp_claims&state=" + encodeURIComponent(auth.searchParams.get("state"));
       await assert.rejects(oauth.handleCallback(callback), scenario.name === "oversized token" ? /oversized/ : /validation failed/, scenario.name);
     }
   } finally { await rm(dir, { recursive: true, force: true }); }
