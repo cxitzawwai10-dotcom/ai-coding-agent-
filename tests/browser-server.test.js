@@ -35,3 +35,32 @@ test("account switching cancels active requests and refreshes models on the fixe
     assert.deepEqual(calls,[["cancel"],["select","a"],["models"]]);
   } finally { await app.close(); }
 });
+
+test("browser API supports encrypted credential export and host-bound import", async () => {
+  const calls=[];
+  const token="browser-api-token-with-more-than-32-characters";
+  const accountStore={
+    async exportCredentialBundle(id,passphrase){calls.push(["export",id,passphrase]);return {version:1,ciphertext:"encrypted"};}
+  };
+  const chatgptOAuth={
+    async importCredentialBundle(bundle,passphrase){calls.push(["import",bundle,passphrase]);return {id:"imported",email:"person@example.test"};}
+  };
+  const providerClient={async listModels(){return [{id:"model-1",name:"Model 1"}];}};
+  const agent={getStatus:()=>"INITIALIZED",getTaskSummary:()=>({total:0}),getTools:()=>[],getTasks:()=>[]};
+  const app=createBrowserServer({agent,accountStore,chatgptOAuth,providerClient,token,port:0});
+  const address=await app.listen();
+  const base="http://127.0.0.1:"+address.port;
+  const headers={authorization:"Bearer "+token,"content-type":"application/json"};
+  try{
+    const exported=await fetch(base+"/api/chatgpt/accounts/account-1/export",{method:"POST",headers,body:JSON.stringify({passphrase:"long-transfer-passphrase"})});
+    assert.equal(exported.status,200);
+    assert.deepEqual(await exported.json(),{version:1,ciphertext:"encrypted"});
+    const imported=await fetch(base+"/api/chatgpt/credentials/import",{method:"POST",headers,body:JSON.stringify({bundle:{version:1,ciphertext:"encrypted"},passphrase:"long-transfer-passphrase"})});
+    assert.equal(imported.status,200);
+    const data=await imported.json();
+    assert.equal(data.account.id,"imported");
+    assert.equal(data.models[0].id,"model-1");
+    assert.equal(data.endpoint,"https://api.openai.com/v1");
+    assert.deepEqual(calls,[["export","account-1","long-transfer-passphrase"],["import",{version:1,ciphertext:"encrypted"},"long-transfer-passphrase"]]);
+  }finally{await app.close();}
+});
