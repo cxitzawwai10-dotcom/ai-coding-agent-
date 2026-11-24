@@ -5,7 +5,7 @@ The Sign in with ChatGPT open-source plan-usage flow uses a loopback callback su
 
 A remote Node.js host accessed from an Android browser cannot receive the phone's loopback callback. This repository deliberately refuses ChatGPT plan OAuth when AI_AGENT_HOST is set to a remote interface. Do not work around this with a localhost substitution, cookie scraping, or ChatGPT private endpoints.
 
-OpenAI's current Sign in with ChatGPT docs say open-source plan usage is for open-source/local-hosted apps; paid or remotely hosted apps should complete the OpenAI interest form. Remote-host deployment requires OpenAI's approval and the supported redirect/client configuration before enabling the OAuth flow.
+OpenAI documents a supported self-hosted-VM path: complete OAuth locally with the same tool/client, then securely transfer the protected credential record to the VM and preserve that VM's own host ID. This repository does not yet implement the Android-local callback bridge or the secure credential-transfer/import wizard, so that route is not end-to-end available here. For paid or remotely hosted products outside the self-hosted-VM workflow, OpenAI requires its interest/approval process.
 
 ## Environment
 - AI_AGENT_VAULT_KEY: high-entropy secret, at least 32 characters; encrypts OAuth tokens at rest.
@@ -27,7 +27,7 @@ Never commit secrets or OAuth credentials. Do not put tokens in project memory, 
 - ChatGPT plan usage requires the chatgpt.tokens.use.direct scope and an eligible ChatGPT plan. Identity-only sign-in is not AI inference authorization.
 
 ## Remote hosting
-Do not deploy this open-source loopback OAuth path as a remote web login. For a remote-hosted product, first obtain OpenAI approval through the documented interest process and implement the exact approved redirect/client model. The existing remote browser service may still host other non-OAuth UI, but ChatGPT plan inference remains disabled there.
+Do not deploy this open-source loopback OAuth path as a remote web login. For a self-hosted VM, the supported pattern is local OAuth followed by secure credential transfer, with the VM's host ID preserved; the transfer bridge is still pending in this repository. For a paid or remotely hosted product outside that VM workflow, first obtain OpenAI approval through the documented interest process and implement the exact approved redirect/client model.
 
 ## Release checks
 - Run CI and inspect every job result.
