@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { pipeline } from "node:stream/promises";
 
 const MAX_BYTES = 1024 * 1024;
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
@@ -84,6 +83,23 @@ export class WorkspaceTools {
     } finally { await handle.close(); }
   }
 
+  async copyHandle(source, destination) {
+    const buffer = Buffer.alloc(64 * 1024);
+    let total = 0;
+    while (true) {
+      const { bytesRead } = await source.read(buffer, 0, buffer.length, null);
+      if (!bytesRead) break;
+      total += bytesRead;
+      if (total > MAX_BYTES) throw new Error("Existing file exceeds 1 MB and cannot be backed up safely.");
+      let offset = 0;
+      while (offset < bytesRead) {
+        const { bytesWritten } = await destination.write(buffer, offset, bytesRead - offset, null);
+        if (!bytesWritten) throw new Error("Backup write made no progress.");
+        offset += bytesWritten;
+      }
+    }
+  }
+
   async write(relativePath, content) {
     if (typeof content !== "string" || Buffer.byteLength(content) > MAX_BYTES) throw new Error("Invalid content or file exceeds 1 MB.");
     const { root, target, parent } = await this.resolveParent(relativePath);
@@ -102,7 +118,6 @@ export class WorkspaceTools {
 
     let backup = null;
     let temp = null;
-    let backupPath = null;
     let tempPath = null;
     try {
       if (existed) {
@@ -113,9 +128,9 @@ export class WorkspaceTools {
         if (ds.isSymbolicLink() || !ds.isDirectory()) throw new Error("Backup directory must be a real directory, not a symlink.");
         const realDir = await fs.realpath(dir);
         if (!this.isInside(realDir)) throw new Error("Backup directory is outside workspace.");
-        backupPath = path.join(realDir, `${Date.now()}-${randomUUID()}.bak`);
+        const backupPath = path.join(realDir, `${Date.now()}-${randomUUID()}.bak`);
         backup = await fs.open(backupPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | NOFOLLOW, 0o600);
-        await pipeline(source.createReadStream({ autoClose: false }), backup.createWriteStream({ autoClose: false }));
+        await this.copyHandle(source, backup);
         await backup.sync();
         await backup.close();
         backup = null;
