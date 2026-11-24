@@ -12,7 +12,7 @@ test("workspace read rejects symlinks pointing outside workspace", async () => {
     await fs.writeFile(path.join(outside, "secret.txt"), "secret");
     await fs.symlink(path.join(outside, "secret.txt"), path.join(root, "escape.txt"));
     const workspace = new WorkspaceTools(root);
-    await assert.rejects(workspace.read("escape.txt"), /outside workspace/);
+    await assert.rejects(workspace.read("escape.txt"), /outside workspace|symbolic links are not allowed/i);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
     await fs.rm(outside, { recursive: true, force: true });
