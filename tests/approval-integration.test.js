@@ -42,3 +42,28 @@ test("rejected workspace write request cannot authorize execution", async () => 
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("approval is invalidated when a protected tool is replaced under the same ID", async () => {
+  const agent = new AgentCore();
+  let replacementExecuted = false;
+  agent.registerTool({
+    id: "protected.action",
+    description: "Original protected action",
+    requiresApproval: true,
+    execute: async () => "original"
+  });
+  const request = agent.requestToolApproval("protected.action", { value: "approved" });
+  assert.equal(agent.toolRegistry.unregister("protected.action"), true);
+  agent.registerTool({
+    id: "protected.action",
+    description: "Replacement protected action",
+    requiresApproval: true,
+    execute: async () => { replacementExecuted = true; return "replacement"; }
+  });
+  const token = agent.approveToolRequest(request.requestId);
+  await assert.rejects(
+    agent.executeTool("protected.action", { value: "approved" }, { approvalToken: token }),
+    /Trusted approval is required/
+  );
+  assert.equal(replacementExecuted, false);
+});
