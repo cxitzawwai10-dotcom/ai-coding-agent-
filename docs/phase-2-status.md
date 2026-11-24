@@ -7,6 +7,7 @@
 - Bounded approval registries with expired-record cleanup.
 - Workspace listing, bounded reading and approved writing.
 - Task-scoped read-only workspace inspection that attaches source-file context to the approved execution plan.
+- Inspected coding change proposals and sequential file writes requiring a separate one-time approval token for every file.
 - Sequential registered-tool workflows with preflight validation and fail-fast execution.
 - Checked backup directory, symlink rejection, file-identity checks and atomic temporary-file writes.
 - New-file publication that refuses to overwrite a concurrently created target.
