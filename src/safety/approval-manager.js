@@ -18,8 +18,8 @@ export class ApprovalManager {
     return JSON.parse(json);
   }
 
-  fingerprint(id, input) {
-    return createHash("sha256").update(JSON.stringify([id, input])).digest("hex");
+  fingerprint(id, input, binding = null) {
+    return createHash("sha256").update(JSON.stringify([id, binding, input])).digest("hex");
   }
 
   cleanupExpired(now = Date.now()) {
@@ -27,14 +27,14 @@ export class ApprovalManager {
     for (const [hash, item] of this.tokens) if (item.expiresAt <= now) this.tokens.delete(hash);
   }
 
-  request(id, input) {
+  request(id, input, binding = null) {
     this.cleanupExpired();
     if (typeof id !== "string" || !id) throw new Error("Invalid approval tool ID.");
     if (this.pending.size >= this.maxPending) throw new Error("Too many pending approval requests.");
     const saved = this.snapshot(input);
     const requestId = randomBytes(24).toString("hex");
     const expiresAt = Date.now() + this.ttlMs;
-    this.pending.set(requestId, { id, input: saved, fingerprint: this.fingerprint(id, saved), expiresAt });
+    this.pending.set(requestId, { id, input: saved, binding, fingerprint: this.fingerprint(id, saved, binding), expiresAt });
     return { requestId, toolId: id, input: this.snapshot(saved), expiresAt };
   }
 
@@ -53,7 +53,7 @@ export class ApprovalManager {
 
   reject(requestId) { return this.pending.delete(requestId); }
 
-  verify(id, input, options = {}) {
+  verify(id, input, options = {}, binding = null) {
     this.cleanupExpired();
     const token = options?.approvalToken;
     if (typeof token !== "string") return false;
@@ -62,7 +62,7 @@ export class ApprovalManager {
     if (!record) return false;
     this.tokens.delete(hash);
     let fingerprint;
-    try { fingerprint = this.fingerprint(id, this.snapshot(input)); }
+    try { fingerprint = this.fingerprint(id, this.snapshot(input), binding); }
     catch { return false; }
     return record.expiresAt > Date.now() && record.id === id && record.fingerprint === fingerprint;
   }
