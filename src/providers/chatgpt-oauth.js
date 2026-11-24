@@ -90,6 +90,10 @@ export class ChatGPTOAuth {
     this.transactions.set(state, { state, nonce, verifier, redirectUri, clientId: existing?.clientId || null, accountId: existing?.id || null, hostId, createdAt: this.clock() });
     return { authorizationUrl: AUTHORIZE_URL + "?" + params.toString(), expiresInSeconds: 600 };
   }
+  async importCredentialBundle(bundle, passphrase) {
+    const hostId = await this.#hostId();
+    return this.accountStore.importCredentialBundle(bundle, passphrase, hostId);
+  }
   async revokeAccount(accountId) {
     const account = await this.accountStore.getAccountForAuthorization(accountId);
     if (!account) return { removed: false, remoteRevocationConfirmed: false };
