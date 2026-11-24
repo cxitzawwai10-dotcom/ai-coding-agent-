@@ -1,7 +1,7 @@
 # AI Coding Agent - Architecture
 
 ## 1. Project Goal
-Build a local AI Coding Agent for Android using Termux and Ubuntu.
+Build an AI Coding Agent that can be operated from Android without requiring Termux or a local PC setup.
 It must support Burmese conversations, project management, code
 editing, debugging, testing, and persistent project memory.
 
@@ -34,6 +34,13 @@ editing, debugging, testing, and persistent project memory.
 - Back up important files before significant changes.
 - Support recovery from verified backups.
 - Never overwrite backups without authorization.
+
+### Tool Workflow Executor
+- Execute a prevalidated sequence of registered tools in order.
+- Require task-level approval before a task workflow starts.
+- Preserve each protected tool's independent approval checks.
+- Stop immediately when a tool fails and record the task failure.
+- Return ordered per-step results for verification.
 
 ### Safety Manager
 - Require approval for sensitive operations.
