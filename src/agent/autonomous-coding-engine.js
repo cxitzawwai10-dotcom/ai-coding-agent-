@@ -42,7 +42,7 @@ export class AutonomousCodingEngine {
     const files = parseProposal(response.text, paths);
     const proposal = this.agent.prepareCodingChanges(planned.taskId, files);
     const approval = this.agent.approveTask(planned.taskId);
-    return { taskId: planned.taskId, status: approval.status, approvalRequired: true, changes: proposal.changes, note: "Review every proposed file change and approve it before execution." };
+    return { taskId: planned.taskId, status: approval.status, approvalRequired: true, changes: proposal.changes.map(change => ({ ...change, preview: files.find(file => file.path === change.path).content.slice(0, 20000), previewTruncated: files.find(file => file.path === change.path).content.length > 20000 })), note: "Review the displayed file previews. Press the approval button only when you authorize all listed changes and the test run." };
   }
   async executeApproved({ taskId, approvalTokens, testApprovalToken = null }) {
     return this.agent.executeCodingChanges(taskId, approvalTokens, testApprovalToken);
