@@ -44,6 +44,8 @@ editing, debugging, testing, and persistent project memory.
 - Require workspace inspection before preparing a bounded change proposal.
 - Bind each proposed file path and content to its own one-time trusted approval token.
 - Apply changes through the protected workspace write tool only after task approval.
+- Capture every target's prior state before applying changes; on a later write or test failure, restore applied files in reverse order and remove newly created files only when their post-write file identity still matches.
+- Report incomplete rollback explicitly instead of claiming the workspace was restored.
 - Optionally run the workspace test suite after writes, with a separate one-time test approval.
 - Mark the task failed when the approved test run fails; report writes and test results distinctly.
 
