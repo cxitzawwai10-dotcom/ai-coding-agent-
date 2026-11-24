@@ -306,3 +306,54 @@ test("AgentCore rejects workspace inspection for unplanned tasks and invalid pat
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("AgentCore prepares inspected coding changes and applies each with trusted approval", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-coding-plan-"));
+  try {
+    await fs.writeFile(path.join(root, "source.js"), "export const oldValue = 1;");
+    const agent = new AgentCore();
+    agent.attachWorkspace(root);
+    const task = await agent.processTask("Update source.js and add a note");
+    await agent.inspectTaskWorkspace(task.taskId, ["source.js"]);
+    const proposal = agent.prepareCodingChanges(task.taskId, [
+      { path: "source.js", content: "export const newValue = 2;" },
+      { path: "notes.txt", content: "Updated safely." }
+    ]);
+    assert.equal(proposal.changes.length, 2);
+    agent.approveTask(task.taskId);
+
+    const changes = agent.getTask(task.taskId).result.proposedChanges;
+    const tokens = changes.map(change => {
+      const request = agent.requestToolApproval("workspace.write", change);
+      return agent.approveToolRequest(request.requestId);
+    });
+    const result = await agent.executeCodingChanges(task.taskId, tokens);
+    assert.equal(result.status, TASK_STATES.COMPLETED);
+    assert.equal(result.result.changesApplied, 2);
+    assert.match(result.result.verification, /not yet configured/);
+    assert.equal(await fs.readFile(path.join(root, "source.js"), "utf8"), "export const newValue = 2;");
+    assert.equal(await fs.readFile(path.join(root, "notes.txt"), "utf8"), "Updated safely.");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("AgentCore refuses coding changes without inspection or per-file approval tokens", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-coding-plan-deny-"));
+  try {
+    const agent = new AgentCore();
+    agent.attachWorkspace(root);
+    const task = await agent.processTask("Write a file");
+    assert.throws(
+      () => agent.prepareCodingChanges(task.taskId, [{ path: "x.txt", content: "x" }]),
+      /Inspect workspace files/
+    );
+    await agent.inspectTaskWorkspace(task.taskId, ["missing.txt"]).catch(() => {});
+    assert.throws(
+      () => agent.prepareCodingChanges(task.taskId, [{ path: "x.txt", content: "x" }]),
+      /Inspect workspace files/
+    );
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
