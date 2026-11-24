@@ -211,7 +211,9 @@ export class ChatGPTAccountStore {
       found.encryptedTokens = seal({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token || previous.refreshToken, idToken: previous.idToken }, this.key);
       found.expiresAt = new Date(Date.now() + Math.max(0, Number(tokens.expires_in) || 0) * 1000).toISOString();
       found.needsReauth = false;
-      if (Array.isArray(scopes) && scopes.length) found.scopes = [...new Set(scopes)];
+      // An explicitly empty scope array is meaningful: OAuth may revoke every grant.
+      // Never retain stale permissions merely because the new grant list is empty.
+      if (Array.isArray(scopes)) found.scopes = [...new Set(scopes)];
       return found;
     });
     return this.#public(item);
