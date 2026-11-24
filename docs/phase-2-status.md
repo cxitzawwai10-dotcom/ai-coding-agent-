@@ -3,15 +3,15 @@
 ## Implemented
 - Agent Core, Task Planner, Task Lifecycle and Task Registry.
 - Tool registration, discovery, input validation and execution.
-- Trusted one-time approval tokens with expiration and exact-input binding.
-- Workspace listing, reading and approved writing.
-- Existing-file backups under `.agent-backups/`.
-- Workspace path boundary checks.
-- Automated unit, integration and security tests.
+- One-time approval tokens with expiration and exact-input binding.
+- Bounded approval registries with expired-record cleanup.
+- Workspace listing, bounded reading and approved writing.
+- Checked backup directory, symlink rejection and atomic temporary-file writes.
+- Automated unit, integration and security regression tests.
 
 ## Remaining verification
-- Android/Termux end-to-end usage.
+- Android/Termux end-to-end execution.
 - User-facing consent UI integration.
-- Final security review, including filesystem race conditions.
+- Filesystem race testing under concurrent hostile modification.
 
-Automated test success does not by itself establish production security.
+Portable Node.js path operations reduce but cannot completely eliminate all parent-directory TOCTOU races. Automated test success does not by itself establish production security.
