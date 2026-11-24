@@ -44,6 +44,7 @@ async function readBody(request,maxBytes=MAX_BODY){
 
 export function createBrowserServer({agent,projectManager,accountStore,chatgptOAuth,providerClient,codingEngine,token=process.env.AI_AGENT_ACCESS_TOKEN,host="127.0.0.1",port=8787,allowOAuth=host==="127.0.0.1"}){
  if(!agent||typeof token!=="string"||token.length<32)throw new Error("AI_AGENT_ACCESS_TOKEN must be configured with at least 32 characters.");
+ const authFailures=new Map();
  const server=http.createServer(async(request,response)=>{
   response.setHeader("x-content-type-options","nosniff");response.setHeader("cache-control","no-store");response.setHeader("referrer-policy","no-referrer");response.setHeader("x-frame-options","DENY");response.setHeader("permissions-policy","camera=(), microphone=(), geolocation=()");response.setHeader("cross-origin-resource-policy","same-origin");
   const url=new URL(request.url,"http://localhost");
@@ -63,7 +64,17 @@ export function createBrowserServer({agent,projectManager,accountStore,chatgptOA
   }
   if(!url.pathname.startsWith("/api/")){response.writeHead(404);response.end();return;}
   const supplied=request.headers.authorization?.startsWith("Bearer ")?request.headers.authorization.slice(7):"";
-  if(!safeEqual(supplied,token)){response.writeHead(401,{"content-type":"application/json"});response.end(JSON.stringify({error:"Unauthorized"}));return;}
+  if(!safeEqual(supplied,token)){
+   const now=Date.now();const ip=request.socket.remoteAddress||"unknown";
+   for(const [key,entry] of authFailures)if(entry.resetAt<=now)authFailures.delete(key);
+   let entry=authFailures.get(ip);
+   if(!entry&&authFailures.size>=2048){const oldest=authFailures.keys().next().value;if(oldest!==undefined)authFailures.delete(oldest);}
+   if(!entry||entry.resetAt<=now)entry={count:0,resetAt:now+5*60*1000};
+   entry.count++;authFailures.set(ip,entry);
+   response.writeHead(entry.count>10?429:401,{"content-type":"application/json","retry-after":String(Math.max(1,Math.ceil((entry.resetAt-now)/1000)))});
+   response.end(JSON.stringify({error:entry.count>10?"Too many authentication failures. Try again later.":"Unauthorized"}));return;
+  }
+  authFailures.delete(request.socket.remoteAddress||"unknown");
   try{
    let result;
    if(request.method==="GET"&&url.pathname==="/api/status")result={status:agent.getStatus(),tasks:agent.getTaskSummary(),tools:agent.getTools(),chatgptAccounts:await accountStore?.listAccounts?.()??[]};
