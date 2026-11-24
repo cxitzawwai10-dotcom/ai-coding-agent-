@@ -29,7 +29,7 @@ The OAuth callback must reach the same local device that launched the browser. F
 2. Open the local browser page and complete ChatGPT sign-in where plan usage is eligible.
 3. Select the account, enter a transfer passphrase of at least 16 characters, and export the encrypted credential file.
 4. Transfer the file to the VM over a secure channel. Send the passphrase separately.
-5. On the VM, run `npm run setup`, configure the VM behind HTTPS, and bind the app to its private interface (for example `AI_AGENT_HOST=0.0.0.0`). The VM's OAuth login button remains disabled by design.
+5. On the VM, run `npm run setup`, configure Caddy or another trusted HTTPS reverse proxy, and keep the app bound to `127.0.0.1:8787` behind that proxy. Set `AI_AGENT_ALLOW_OAUTH=false`; this disables remote OAuth while keeping the app port off the public interface. See `deploy/README.md` for systemd and Caddy templates.
 6. Open the VM browser page over HTTPS, enter the VM's `AI_AGENT_ACCESS_TOKEN`, import the encrypted credential file, and verify model discovery.
 
 The transfer file uses scrypt + AES-256-GCM. It includes only the selected ChatGPT registration and encrypted transfer payload; it does not include either installation's vault key or host ID. The VM creates/preserves its own host ID and re-encrypts the imported tokens under its vault key. Treat the file as a bearer credential while its passphrase is known.
