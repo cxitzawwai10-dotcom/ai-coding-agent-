@@ -27,7 +27,7 @@ test("App entry connects AgentCore to workspace tools", async () => {
   );
 
   try {
-    const { agent, workspaceRoot, projectManager, projectMemory, dataRoot } = createAgent({
+    const { agent, workspaceRoot, projectManager, projectMemory, dataRoot, taskRegistry } = createAgent({
       workspaceRoot: root,
       dataRoot: path.join(root, "agent-state")
     });
@@ -36,6 +36,10 @@ test("App entry connects AgentCore to workspace tools", async () => {
     assert.equal(dataRoot, path.join(root, "agent-state"));
     assert.ok(projectManager);
     assert.ok(projectMemory);
+    assert.ok(taskRegistry);
+    const created = await agent.processTask("Persist from app factory");
+    const restarted = createAgent({ workspaceRoot: root, dataRoot: path.join(root, "agent-state") });
+    assert.equal(restarted.agent.getTask(created.taskId).status, "PLANNED");
 
     const ids = agent.getTools().map(tool => tool.id);
 
