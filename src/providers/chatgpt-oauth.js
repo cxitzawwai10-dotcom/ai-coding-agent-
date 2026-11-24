@@ -32,8 +32,9 @@ async function verifyIdToken(token, clientId, nonce, fetchImpl) {
   if (header.alg === "PS256") valid = verifySignature("sha256", data, { key: publicKey, padding: constants.RSA_PKCS1_PSS_PADDING, saltLength: 32 }, signature);
   if (header.alg === "ES256") valid = verifySignature("sha256", data, { key: publicKey, dsaEncoding: "ieee-p1363" }, signature);
   const now = Math.floor(Date.now() / 1000);
-  const audienceOk = Array.isArray(claims.aud) ? claims.aud.includes(clientId) : claims.aud === clientId;
-  if (!valid || claims.iss !== ISSUER || !audienceOk || !Number.isFinite(claims.exp) || claims.exp <= now || claims.nonce !== nonce || typeof claims.sub !== "string" || !claims.sub) throw new Error("OpenAI ID token validation failed.");
+  const audienceOk = Array.isArray(claims.aud) ? claims.aud.includes(clientId) && (claims.aud.length === 1 || claims.azp === clientId) : claims.aud === clientId;
+  const notYetValid = Number.isFinite(claims.nbf) && claims.nbf > now + 60;
+  if (!valid || claims.iss !== ISSUER || !audienceOk || notYetValid || !Number.isFinite(claims.exp) || claims.exp <= now || claims.nonce !== nonce || typeof claims.sub !== "string" || !claims.sub) throw new Error("OpenAI ID token validation failed.");
   return claims;
 }
 
@@ -60,6 +61,10 @@ export class ChatGPTOAuth {
   async beginLogin({ redirectUri, existingAccountId = null }) {
     const callback = new URL(redirectUri);
     if (callback.protocol !== "http:" || callback.hostname !== "127.0.0.1" || callback.pathname !== "/auth/openai/callback") throw new Error("ChatGPT plan sign-in requires the official 127.0.0.1 loopback callback.");
+    for (const [pendingState, pending] of this.transactions) {
+      if (this.clock() - pending.createdAt > 10 * 60 * 1000) this.transactions.delete(pendingState);
+    }
+    if (this.transactions.size >= 10) throw new Error("Too many pending ChatGPT sign-in attempts.");
     const state = b64url(randomBytes(32));
     const nonce = b64url(randomBytes(32));
     const verifier = b64url(randomBytes(48));
