@@ -68,3 +68,22 @@ test("credential transfer requires a long passphrase", async () => {
     await assert.rejects(store.importCredentialBundle({}, "too-short", "urn:uuid:host"),/at least 16/);
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
+
+test("persists an explicitly empty refreshed scope set instead of retaining revoked grants", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "chatgpt-empty-scopes-"));
+  try {
+    const store = new ChatGPTAccountStore({ filePath: path.join(dir, "accounts.json"), masterSecret: secret });
+    const account = await store.saveVerifiedAccount(sample("empty-scope-sub", "empty-scope@example.test"));
+    await store.updateTokens(account.id, {
+      access_token: "rotated-without-grants",
+      refresh_token: "rotated-refresh",
+      expires_in: 3600
+    }, []);
+    const listed = (await store.listAccounts())[0];
+    assert.deepEqual(listed.scopes, []);
+    assert.equal(listed.planUsageEnabled, false);
+    const active = await store.getActiveAccount();
+    assert.deepEqual(active.scopes, []);
+    assert.equal(active.tokens.accessToken, "rotated-without-grants");
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
