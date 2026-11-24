@@ -57,7 +57,7 @@ export class ChatGPTOAuth {
     })();
     return this.hostIdPromise;
   }
-  async beginLogin({ redirectUri, existingAccountId = null }) {
+  async beginLogin({ redirectUri, existingAccountId = null, requestConsent = false }) {
     const callback = new URL(redirectUri);
     if (callback.protocol !== "http:" || callback.hostname !== "127.0.0.1" || callback.pathname !== "/auth/openai/callback") throw new Error("ChatGPT plan sign-in requires the official 127.0.0.1 loopback callback.");
     for (const [pendingState, pending] of this.transactions) {
@@ -86,6 +86,7 @@ export class ChatGPTOAuth {
     else {
       params.set("login_hint", existing.email);
       if (existing.tokens?.idToken) params.set("id_token_hint", existing.tokens.idToken);
+      if (requestConsent === true) params.set("prompt", "consent");
     }
     this.transactions.set(state, { state, nonce, verifier, redirectUri, clientId: existing?.clientId || null, accountId: existing?.id || null, hostId, createdAt: this.clock() });
     return { authorizationUrl: AUTHORIZE_URL + "?" + params.toString(), expiresInSeconds: 600 };
