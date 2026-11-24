@@ -9,6 +9,7 @@ Manages tool registration, discovery, validation and execution.
 - Execute asynchronous tools.
 - Validate tool input.
 - Require trusted approval for protected tools.
+- Bind each approval to the exact tool registration, preventing a replacement tool with the same ID from reusing an earlier approval.
 
 Protected tools require an injected approvalVerifier callback. A caller-provided boolean such as approved: true is not sufficient.
 
