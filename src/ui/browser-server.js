@@ -62,7 +62,7 @@ export function createBrowserServer({agent,projectManager,accountStore,chatgptOA
     const body=await readBody(request);providerClient?.cancelActiveRequests();const account=await accountStore.selectAccount(body.id);const models=await providerClient.listModels();result={account,models,endpoint:"https://api.openai.com/v1"};
    }
    else if(request.method==="GET"&&url.pathname==="/api/chatgpt/models")result=await providerClient.listModels();
-   else if(request.method==="POST"&&/^\\/api\\/chatgpt\\/accounts\\/[^/]+\\/export$/.test(url.pathname)){
+   else if(request.method==="POST"&&/^\/api\/chatgpt\/accounts\/[^/]+\/export$/.test(url.pathname)){
     if(!accountStore)throw new Error("Configure AI_AGENT_VAULT_KEY before exporting ChatGPT credentials.");
     const body=await readBody(request);const id=decodeURIComponent(url.pathname.split("/")[4]);result=await accountStore.exportCredentialBundle(id,body.passphrase);
    }
