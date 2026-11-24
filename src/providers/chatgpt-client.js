@@ -64,9 +64,14 @@ export class ChatGPTClient {
           throw new Error(apiFailure("ChatGPT session refresh failed", response, refreshed) + (code ? "" : " Reconnect the account if the session has expired."));
         }
         if (!refreshed.refresh_token || !Number.isFinite(Number(refreshed.expires_in))) throw new Error("ChatGPT refresh response did not include a replacement refresh token and expiry.");
-        const refreshedScopes = String(refreshed.scope || "").trim().split(/\s+/).filter(Boolean);
+        // OAuth token responses may omit scope when the granted scope is unchanged.
+        // Preserve the previously verified grants in that case; an explicit scope
+        // value replaces them and must still contain plan-usage permission.
+        const refreshedScopes = Object.hasOwn(refreshed, "scope")
+          ? String(refreshed.scope || "").trim().split(/\s+/).filter(Boolean)
+          : [...account.scopes];
         await this.accountStore.updateTokens(account.id, refreshed, refreshedScopes);
-        if (refreshedScopes.length && !refreshedScopes.includes(PLAN_SCOPE)) {
+        if (!refreshedScopes.includes(PLAN_SCOPE)) {
           throw new Error("The refreshed ChatGPT session no longer grants plan-usage permission. Reconnect and explicitly enable ChatGPT plan usage before continuing.");
         }
         return refreshed.access_token;
