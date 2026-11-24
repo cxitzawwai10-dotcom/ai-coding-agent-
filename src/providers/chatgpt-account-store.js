@@ -31,7 +31,7 @@ function validate(state) {
         item.issuer !== "https://auth.openai.com" || typeof item.subject !== "string" || !item.subject ||
         typeof item.clientId !== "string" || !/^oaiapp_[A-Za-z0-9_-]+$/.test(item.clientId) ||
         typeof item.email !== "string" || !Array.isArray(item.scopes) || item.scopes.some(scope => typeof scope !== "string") ||
-        typeof item.expiresAt !== "string" || !item.extAgentHostId ||
+        typeof item.expiresAt !== "string" || !Number.isFinite(Date.parse(item.expiresAt)) || typeof item.extAgentHostId !== "string" || !item.extAgentHostId ||
         !encrypted || typeof encrypted.iv !== "string" || typeof encrypted.tag !== "string" || typeof encrypted.data !== "string") {
       throw new Error("ChatGPT account store contains an invalid record.");
     }
@@ -67,7 +67,7 @@ export class ChatGPTAccountStore {
     return { id: item.id, email: item.email, name: item.name, subject: item.subject, clientId: item.clientId, scopes: [...item.scopes], planUsageEnabled: item.scopes.includes(REQUIRED_SCOPE), needsReauth: item.needsReauth === true, expiresAt: item.expiresAt, isActive: this.state.activeAccountId === item.id };
   }
   async saveVerifiedAccount({ issuer, subject, clientId, email, name = "", idToken, tokens, scopes, extAgentHostId }) {
-    if (issuer !== "https://auth.openai.com" || !subject || !/^oaiapp_[A-Za-z0-9_-]+$/.test(clientId) || typeof email !== "string" || !idToken || !tokens?.access_token || !Array.isArray(scopes) || !extAgentHostId) throw new Error("Verified ChatGPT account data is incomplete.");
+    if (issuer !== "https://auth.openai.com" || typeof subject !== "string" || !subject || !/^oaiapp_[A-Za-z0-9_-]+$/.test(clientId || "") || typeof email !== "string" || typeof idToken !== "string" || !idToken || typeof tokens?.access_token !== "string" || !tokens.access_token || !Number.isFinite(Number(tokens.expires_in)) || Number(tokens.expires_in) < 0 || !Array.isArray(scopes) || scopes.some(scope => typeof scope !== "string") || typeof extAgentHostId !== "string" || !extAgentHostId) throw new Error("Verified ChatGPT account data is incomplete.");
     const account = await this.#mutate(next => {
       let item = next.accounts.find(a => a.issuer === issuer && a.subject === subject && a.clientId === clientId);
       if (!item) {
