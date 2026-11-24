@@ -60,6 +60,9 @@ test("Docker sandbox stages a sanitized snapshot without secrets or symlinks", a
     await fs.writeFile(path.join(root, "source.js"), "export const safe = true;");
     await fs.writeFile(path.join(root, ".env"), "API_KEY=must-not-enter-container");
     await fs.writeFile(path.join(root, "service-token.txt"), "secret");
+    await fs.mkdir(path.join(root, ".agent-data"));
+    await fs.writeFile(path.join(root, ".agent-data", "chatgpt-accounts.json"), "encrypted account data");
+    await fs.writeFile(path.join(root, ".agent-data", "tasks.json"), "private task data");
     await fs.symlink(path.join(root, "source.js"), path.join(root, "linked.js"));
     const sandbox = new DockerTestSandbox({
       exec: async (_command, args) => {
@@ -68,6 +71,7 @@ test("Docker sandbox stages a sanitized snapshot without secrets or symlinks", a
         assert.equal(await fs.readFile(path.join(mountedRoot, "source.js"), "utf8"), "export const safe = true;");
         await assert.rejects(fs.access(path.join(mountedRoot, ".env")));
         await assert.rejects(fs.access(path.join(mountedRoot, "service-token.txt")));
+        await assert.rejects(fs.access(path.join(mountedRoot, ".agent-data")));
         await assert.rejects(fs.access(path.join(mountedRoot, "linked.js")));
         return { stdout: "ok", stderr: "" };
       }
