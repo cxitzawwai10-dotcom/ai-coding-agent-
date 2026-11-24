@@ -8,7 +8,8 @@
 - Project Memory: project-scoped notes/decisions/tasks, tags, timestamps, bounded content, list/filter, text/tag/type search, individual removal, and project memory clear.
 - Project and memory services are exposed from `createAgent()`; callers can configure `dataRoot`.
 - Default runtime data directory is `.agent-data/`, excluded from Git.
-- Automated tests cover persistence across service restarts, CRUD, isolation between projects, validation, limits, corrupt JSON, and concurrent writes.
+- Persistent task registry saves task records, plans/results, status transitions, and history across restarts. The agent restores task lifecycles on startup and marks tasks interrupted in EXECUTING state as FAILED instead of silently resuming unsafe work.
+- Automated tests cover persistence across service restarts, CRUD, isolation between projects, task lifecycle recovery, validation, limits, corrupt JSON, and concurrent writes.
 - Architecture and repository guidance updated for Android-browser-first development without requiring Termux.
 
 ## Storage and deployment boundaries
