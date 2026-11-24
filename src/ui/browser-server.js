@@ -38,8 +38,11 @@ export function createBrowserServer({agent,projectManager,accountStore,chatgptOA
    try{
     if(host!=="127.0.0.1")throw new Error("ChatGPT plan OAuth is available only when the agent is running locally with the official 127.0.0.1 loopback callback.");
     if(!chatgptOAuth)throw new Error("Configure AI_AGENT_VAULT_KEY before connecting ChatGPT.");
+    const callbackAddress=server.address();
+    if(!callbackAddress||typeof callbackAddress==="string")throw new Error("Local callback listener is not ready.");
     providerClient?.cancelActiveRequests?.();
-    const account=await chatgptOAuth.handleCallback(url.href);
+    const callbackUrl=new URL(request.url,"http://127.0.0.1:"+callbackAddress.port);
+    const account=await chatgptOAuth.handleCallback(callbackUrl.href);
     response.writeHead(200,{"content-type":"text/html; charset=utf-8"});response.end("<!doctype html><meta charset=utf-8><title>ChatGPT connected</title><h2>ChatGPT account connected</h2><p>ChatGPT account ချိတ်ဆက်ပြီးပါပြီ။</p><p><a href="/">AI Coding Agent သို့ပြန်သွားရန်</a></p>");
    }catch(error){response.writeHead(400,{"content-type":"text/plain; charset=utf-8"});response.end(error instanceof Error?error.message:"ChatGPT sign-in failed.");}
    return;
