@@ -16,14 +16,14 @@
 - Each JSON file is limited to 5 MiB; project count is limited to 500; memory entries to 2,000; each memory item to 10,000 characters.
 - Writes are serialized inside one Node.js process. This is not a multi-process transactional database. A multi-instance hosted deployment must replace this adapter with a transactional shared database before concurrent multi-instance writes are enabled.
 - The data directory must be private to the agent process and backed up by the deployment. JSON persistence does not encrypt memory at rest.
-- Persistent task history uses a single-writer local JSON store. Run only one active agent process per `dataRoot`; multi-process hosted deployment requires a transactional shared database.
+- Persistent task history uses a single-writer local JSON store. Run only one active agent process per `dataRoot`; multi-process hosted deployment requires a transactional shared database. Task descriptions and plan/results may contain source context, so keep this directory private and do not put credentials or secrets into task content or memory.
 - In-flight tasks are never resumed automatically after restart. Tasks found in `EXECUTING` state are marked `FAILED` with an interruption reason; inspect and retry deliberately.
 
 ## Verified GitHub Actions results
 - CI run [45365646261](https://github.com/cxitzawwai10-dotcom/ai-coding-agent-/actions/runs/45365646261): successful.
-- Node.js 24 suite: **99 tests, 98 passed, 0 failed, 1 intentionally skipped** (the real Docker integration test runs in its own job).
+- Node.js 24 suite: **103 tests, 102 passed, 0 failed, 1 intentionally skipped** (the real Docker integration test runs in its own job).
 - Docker sandbox integration: **1 passed, 0 failed**.
-- Phase 2 Security Tests workflow for the same implementation commit: successful; its Node.js suite also reported 98 passed, 0 failed, 1 skipped.
+- Phase 2 Security Tests workflow for the same implementation commit: successful; its Node.js suite also reported 102 passed, 0 failed, 1 skipped.
 
 ## Phase 3 completion boundary
 Project metadata, project-scoped memory, and durable task history are implemented. Multi-process transactional storage and encryption at rest remain deployment requirements and are not covered by this local JSON adapter.
