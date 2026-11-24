@@ -69,3 +69,22 @@ test("CLI consent denies and clears pending request when stdin reaches EOF", asy
   assert.equal(agent.calls.length, 0);
   assert.deepEqual(agent.rejected, ["request-1"]);
 });
+
+
+test("unprotected tools execute without an approval prompt", async () => {
+  let executed = false;
+  const agent = {
+    getTools: () => [{ id: "workspace.list", description: "List workspace files.", requiresApproval: false }],
+    executeTool: async () => { executed = true; return ["file.txt"]; }
+  };
+  const stdout = new PassThrough();
+  let output = "";
+  stdout.on("data", chunk => { output += chunk.toString(); });
+  const result = await executeToolWithCliConsent(agent, "workspace.list", {}, {
+    stdin: new PassThrough(),
+    stdout
+  });
+  assert.deepEqual(result, ["file.txt"]);
+  assert.equal(executed, true);
+  assert.doesNotMatch(output, /TOOL APPROVAL REQUIRED/);
+});
