@@ -330,7 +330,7 @@ test("AgentCore prepares inspected coding changes and applies each with trusted 
     const result = await agent.executeCodingChanges(task.taskId, tokens);
     assert.equal(result.status, TASK_STATES.COMPLETED);
     assert.equal(result.result.changesApplied, 2);
-    assert.match(result.result.verification, /not yet configured/);
+    assert.match(result.result.verification, /not requested/);
     assert.equal(await fs.readFile(path.join(root, "source.js"), "utf8"), "export const newValue = 2;");
     assert.equal(await fs.readFile(path.join(root, "notes.txt"), "utf8"), "Updated safely.");
   } finally {
@@ -353,6 +353,72 @@ test("AgentCore refuses coding changes without inspection or per-file approval t
       () => agent.prepareCodingChanges(task.taskId, [{ path: "x.txt", content: "x" }]),
       /Inspect workspace files/
     );
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+
+test("AgentCore runs Node workspace tests only with trusted approval after coding changes", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-coding-test-pass-"));
+  try {
+    await fs.writeFile(path.join(root, "source.js"), "export const value = 1;\\n");
+    await fs.writeFile(
+      path.join(root, "source.test.js"),
+      'import test from "node:test";\\nimport assert from "node:assert/strict";\\nimport { value } from "./source.js";\\ntest("updated source value", () => assert.equal(value, 2));\\n'
+    );
+    const agent = new AgentCore();
+    agent.attachWorkspace(root);
+    const task = await agent.processTask("Update source and run tests");
+    await agent.inspectTaskWorkspace(task.taskId, ["source.js", "source.test.js"]);
+    agent.prepareCodingChanges(task.taskId, [
+      { path: "source.js", content: "export const value = 2;\\n" }
+    ]);
+    agent.approveTask(task.taskId);
+
+    const change = agent.getTask(task.taskId).result.proposedChanges[0];
+    const writeRequest = agent.requestToolApproval("workspace.write", change);
+    const writeToken = agent.approveToolRequest(writeRequest.requestId);
+    const testRequest = agent.requestToolApproval("workspace.test", {});
+    const testToken = agent.approveToolRequest(testRequest.requestId);
+
+    const result = await agent.executeCodingChanges(task.taskId, [writeToken], testToken);
+    assert.equal(result.status, TASK_STATES.COMPLETED);
+    assert.equal(result.result.tests.passed, true);
+    assert.equal(result.result.tests.exitCode, 0);
+    assert.match(result.result.verification, /All workspace tests passed/);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("AgentCore marks coding execution failed when approved workspace tests fail", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-coding-test-fail-"));
+  try {
+    await fs.writeFile(path.join(root, "source.js"), "export const value = 1;\\n");
+    await fs.writeFile(
+      path.join(root, "source.test.js"),
+      'import test from "node:test";\\nimport assert from "node:assert/strict";\\nimport { value } from "./source.js";\\ntest("expected value", () => assert.equal(value, 99));\\n'
+    );
+    const agent = new AgentCore();
+    agent.attachWorkspace(root);
+    const task = await agent.processTask("Run failing project tests");
+    await agent.inspectTaskWorkspace(task.taskId, ["source.js", "source.test.js"]);
+    agent.prepareCodingChanges(task.taskId, [
+      { path: "source.js", content: "export const value = 2;\\n" }
+    ]);
+    agent.approveTask(task.taskId);
+
+    const change = agent.getTask(task.taskId).result.proposedChanges[0];
+    const writeRequest = agent.requestToolApproval("workspace.write", change);
+    const writeToken = agent.approveToolRequest(writeRequest.requestId);
+    const testRequest = agent.requestToolApproval("workspace.test", {});
+    const testToken = agent.approveToolRequest(testRequest.requestId);
+
+    const result = await agent.executeCodingChanges(task.taskId, [writeToken], testToken);
+    assert.equal(result.status, TASK_STATES.FAILED);
+    assert.match(result.error, /Workspace tests failed/);
+    assert.equal(await fs.readFile(path.join(root, "source.js"), "utf8"), "export const value = 2;\\n");
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }
