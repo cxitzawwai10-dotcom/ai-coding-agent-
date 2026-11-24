@@ -97,7 +97,7 @@ test("browser API rejects non-JSON bodies and sends browser isolation headers", 
     assert.equal(page.headers.get("x-frame-options"), "DENY");
     assert.equal(page.headers.get("x-content-type-options"), "nosniff");
     assert.equal(page.headers.get("permissions-policy"), "camera=(), microphone=(), geolocation=()");
-    const response = await fetch(base + "/api/chatgpt/login", {
+    const response = await fetch(base + "/api/chatgpt/accounts/select", {
       method: "POST",
       headers: { authorization: "Bearer " + token, "content-type": "text/plain" },
       body: "{}"
