@@ -22,6 +22,23 @@ export class AgentCore {
       (id, input, options, binding) => this.approvalManager.verify(id, input, options, binding)
     );
     this.lifecycles = new Map();
+    for (const record of this.registry.list()) {
+      const states = Array.isArray(record.history)
+        ? record.history.map(entry => entry.status)
+        : [record.status];
+      const lifecycle = TaskLifecycle.restore(states);
+      if (lifecycle.getState() !== record.status) {
+        throw new Error("Persisted task lifecycle does not match its task status.");
+      }
+      if (record.status === TASK_STATES.EXECUTING) {
+        lifecycle.transition(TASK_STATES.FAILED);
+        this.registry.update(record.id, {
+          status: TASK_STATES.FAILED,
+          error: "Task interrupted by an application restart before completion."
+        });
+      }
+      this.lifecycles.set(record.id, lifecycle);
+    }
   }
 
   getStatus() {
