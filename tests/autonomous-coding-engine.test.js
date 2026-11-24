@@ -18,3 +18,12 @@ test("coding engine rejects modifications to paths that were not inspected",asyn
  let n=0;const engine=new AutonomousCodingEngine({agent,providerClient:{async generate(){n++;return {text:n===1?'{"paths":["src/a.js"]}':'{"files":[{"path":"src/b.js","content":"x"}]}'}}}});
  await assert.rejects(engine.createProposal({task:"bad"}),/uninspected/);
 });
+
+test("coding engine returns the complete file content for review before approval",async()=>{
+ const agent={async processTask(){return {taskId:"task-review",status:"RECEIVED"};},async inspectTaskWorkspace(){return {files:[{path:"src/review.js",exists:true,content:"old"}]};},prepareCodingChanges(id,files){return {changes:files.map(file=>({path:file.path,requiresApproval:true}))};},approveTask(){return {status:"WAITING_FOR_APPROVAL"};}};
+ const fullContent="export const reviewed = true;\\n"+"x".repeat(25000);
+ let n=0;const providerClient={async generate(){n++;return {text:n===1?'{"paths":["src/review.js"]}':JSON.stringify({files:[{path:"src/review.js",content:fullContent}]})};}};
+ const result=await new AutonomousCodingEngine({agent,providerClient}).createProposal({task:"Change file"});
+ assert.equal(result.changes[0].preview,fullContent);
+ assert.equal(result.changes[0].previewTruncated,false);
+});
