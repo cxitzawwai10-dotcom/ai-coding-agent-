@@ -56,6 +56,7 @@ test("validates the OAuth state, issued client ID, ID-token signature, nonce and
     nonce = auth.searchParams.get("nonce");
     const state = auth.searchParams.get("state");
     await assert.rejects(oauth.handleCallback("http://127.0.0.1:1455/auth/openai/callback?code=bad&client_id=oaiapp_issued123&state=wrong"),/state is invalid/);
+    await assert.rejects(oauth.handleCallback("http://127.0.0.1:1456/auth/openai/callback?code=bad&client_id=oaiapp_issued123&state="+encodeURIComponent(state)),/does not match/);
     const account = await oauth.handleCallback("http://127.0.0.1:1455/auth/openai/callback?code=valid&client_id=oaiapp_issued123&state="+encodeURIComponent(state));
     assert.equal(account.id,"stored-account");
     assert.equal(saved.subject,"account-subject");
