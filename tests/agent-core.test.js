@@ -181,3 +181,81 @@ test("AgentCore refuses execution without a valid executor", async () => {
     TASK_STATES.WAITING_FOR_APPROVAL
   );
 });
+
+test("AgentCore executes registered tools sequentially within an approved task", async () => {
+  const order = [];
+  const agent = new AgentCore();
+  agent.registerTool({
+    id: "prepare",
+    description: "Prepare a resource",
+    execute: async input => { order.push("prepare"); return `prepared:${input.value}`; }
+  });
+  agent.registerTool({
+    id: "finish",
+    description: "Finish the resource",
+    execute: async input => { order.push("finish"); return `finished:${input.value}`; }
+  });
+
+  const task = await agent.processTask("Run a two-step tool workflow");
+  agent.approveTask(task.taskId);
+  const result = await agent.executeToolSequence(task.taskId, [
+    { toolId: "prepare", input: { value: "item" } },
+    { toolId: "finish", input: { value: "item" } }
+  ]);
+
+  assert.deepEqual(order, ["prepare", "finish"]);
+  assert.equal(result.status, TASK_STATES.COMPLETED);
+  assert.equal(result.result.stepsCompleted, 2);
+  assert.deepEqual(result.result.results.map(item => item.result), [
+    "prepared:item",
+    "finished:item"
+  ]);
+});
+
+test("AgentCore validates the complete tool sequence before executing any step", async () => {
+  let executions = 0;
+  const agent = new AgentCore();
+  agent.registerTool({
+    id: "safe",
+    description: "Safe test tool",
+    execute: async () => { executions += 1; return true; }
+  });
+  const task = await agent.processTask("Reject invalid workflow");
+  agent.approveTask(task.taskId);
+
+  await assert.rejects(
+    agent.executeToolSequence(task.taskId, [
+      { toolId: "safe", input: {} },
+      { toolId: "missing", input: {} }
+    ]),
+    /Unknown tool in sequence/
+  );
+  assert.equal(executions, 0);
+  assert.equal(agent.getTask(task.taskId).status, TASK_STATES.WAITING_FOR_APPROVAL);
+});
+
+test("AgentCore stops a tool sequence after a tool fails", async () => {
+  const order = [];
+  const agent = new AgentCore();
+  agent.registerTool({
+    id: "break",
+    description: "Failing tool",
+    execute: async () => { order.push("break"); throw new Error("step failed"); }
+  });
+  agent.registerTool({
+    id: "never",
+    description: "Must not run",
+    execute: async () => { order.push("never"); }
+  });
+  const task = await agent.processTask("Stop on tool error");
+  agent.approveTask(task.taskId);
+
+  const result = await agent.executeToolSequence(task.taskId, [
+    { toolId: "break", input: {} },
+    { toolId: "never", input: {} }
+  ]);
+
+  assert.equal(result.status, TASK_STATES.FAILED);
+  assert.equal(result.error, "step failed");
+  assert.deepEqual(order, ["break"]);
+});
