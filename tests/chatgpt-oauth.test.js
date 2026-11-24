@@ -64,3 +64,26 @@ test("validates the OAuth state, issued client ID, ID-token signature, nonce and
     assert.match(saved.extAgentHostId,/^urn:uuid:/);
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
+
+test("revokes the renewable ChatGPT session before removing an account", async () => {
+  const calls=[];
+  let removed=false;
+  const accountStore={
+    async getAccountForAuthorization(id){assert.equal(id,"account-id");return {id,clientId:"oaiapp_revoke",tokens:{refreshToken:"refresh-secret"}};},
+    async removeAccount(id){assert.equal(id,"account-id");removed=true;return true;}
+  };
+  const oauth=new ChatGPTOAuth({accountStore,hostIdPath:"/tmp/unused-chatgpt-host-"+Date.now()+".json",fetchImpl:async(url,options={})=>{
+    calls.push({url,options});
+    if(url==="https://auth.openai.com/.well-known/openid-configuration")return {ok:true,json:async()=>({revocation_endpoint:"https://auth.openai.com/api/accounts/oauth/revoke"})};
+    if(url==="https://auth.openai.com/api/accounts/oauth/revoke")return {status:200,ok:true};
+    throw new Error("Unexpected URL");
+  }});
+  const result=await oauth.revokeAccount("account-id");
+  assert.equal(result.removed,true);
+  assert.equal(result.remoteRevocationConfirmed,true);
+  assert.equal(removed,true);
+  const form=new URLSearchParams(calls[1].options.body);
+  assert.equal(form.get("token"),"refresh-secret");
+  assert.equal(form.get("token_type_hint"),"refresh_token");
+  assert.equal(form.get("client_id"),"oaiapp_revoke");
+});
