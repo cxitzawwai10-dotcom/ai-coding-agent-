@@ -5,6 +5,27 @@ import os from "node:os";
 import path from "node:path";
 import { WorkspaceTools } from "../src/tools/workspace-tools.js";
 
+
+test("workspace file identity check distinguishes replacement files", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "workspace-identity-"));
+  try {
+    const first = path.join(root, "first.txt");
+    const hardlink = path.join(root, "first-link.txt");
+    const second = path.join(root, "second.txt");
+    await fs.writeFile(first, "same inode");
+    await fs.link(first, hardlink);
+    await fs.writeFile(second, "different inode");
+    const workspace = new WorkspaceTools(root);
+    const firstStat = await fs.stat(first);
+    const linkStat = await fs.stat(hardlink);
+    const secondStat = await fs.stat(second);
+    assert.equal(workspace.sameFile(firstStat, linkStat), true);
+    assert.equal(workspace.sameFile(firstStat, secondStat), false);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("workspace read rejects symlinks pointing outside workspace", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "workspace-link-"));
   const outside = await fs.mkdtemp(path.join(os.tmpdir(), "outside-link-"));
