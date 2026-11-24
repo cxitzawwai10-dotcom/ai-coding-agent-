@@ -388,7 +388,7 @@ test("AgentCore runs Node workspace tests only with trusted approval after codin
     );
     assert.equal(
       await fs.readFile(path.join(root, "source.js"), "utf8"),
-      "export const value = 1;\\n"
+      "export const value = 1;\n"
     );
 
     const result = await agent.executeCodingChanges(task.taskId, [writeToken], testToken);
