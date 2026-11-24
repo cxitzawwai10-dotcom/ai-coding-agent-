@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { createAgent } from "../src/index.js";
 
 test("AI Coding Agent starts successfully", () => {
   const result = spawnSync(
@@ -12,4 +16,36 @@ test("AI Coding Agent starts successfully", () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /AI Coding Agent is starting/);
   assert.match(result.stdout, /Status: INITIALIZED/);
+  assert.match(result.stdout, /workspace\.list/);
+  assert.match(result.stdout, /workspace\.read/);
+  assert.match(result.stdout, /workspace\.write/);
+});
+
+test("App entry connects AgentCore to workspace tools", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "ai-agent-entry-")
+  );
+
+  try {
+    const { agent, workspaceRoot } = createAgent({
+      workspaceRoot: root
+    });
+
+    assert.equal(workspaceRoot, root);
+
+    const ids = agent.getTools().map(tool => tool.id);
+
+    assert.ok(ids.includes("workspace.list"));
+    assert.ok(ids.includes("workspace.read"));
+    assert.ok(ids.includes("workspace.write"));
+
+    assert.equal(
+      agent.getTools().find(
+        tool => tool.id === "workspace.write"
+      ).requiresApproval,
+      true
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

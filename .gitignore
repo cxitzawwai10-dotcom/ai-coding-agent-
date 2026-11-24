@@ -7,3 +7,7 @@ coverage/
 .nyc_output/
 data/*
 !data/.gitkeep
+
+# Local agent backups
+.agent-backups/
+*.broken-backup

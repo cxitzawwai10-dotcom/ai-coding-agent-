@@ -1,17 +1,25 @@
 import { TaskPlanner } from "./task-planner.js";
 import { TaskLifecycle, TASK_STATES } from "./task-lifecycle.js";
 import { TaskRegistry } from "./task-registry.js";
+import { ToolRegistry } from "../tools/tool-registry.js";
+import { registerWorkspaceTools } from "../tools/register-workspace-tools.js";
+import { ApprovalManager } from "../safety/approval-manager.js";
 
 export class AgentCore {
   constructor(
     planner = new TaskPlanner(),
     registry = new TaskRegistry(),
-    executor = null
+    executor = null,
+    toolRegistry = null
   ) {
     this.status = "INITIALIZED";
     this.planner = planner;
     this.registry = registry;
     this.executor = executor;
+    this.approvalManager = new ApprovalManager();
+    this.toolRegistry = toolRegistry ?? new ToolRegistry(
+      (id, input, options) => this.approvalManager.verify(id, input, options)
+    );
     this.lifecycles = new Map();
   }
 
@@ -233,4 +241,39 @@ export class AgentCore {
       };
     }
   }
+
+  registerTool(definition) {
+    return this.toolRegistry.register(definition);
+  }
+
+  getTools() {
+    return this.toolRegistry.list();
+  }
+
+  executeTool(id, input, options = {}) {
+    return this.toolRegistry.execute(id, input, options);
+  }
+
+
+  requestToolApproval(id, input) {
+    const tool = this.toolRegistry.get(id);
+    if (!tool) throw new Error("Tool not found.");
+    if (!tool.requiresApproval) {
+      throw new Error("This tool does not require approval.");
+    }
+    return this.approvalManager.request(id, input);
+  }
+
+  approveToolRequest(requestId) {
+    return this.approvalManager.approve(requestId);
+  }
+
+  rejectToolRequest(requestId) {
+    return this.approvalManager.reject(requestId);
+  }
+
+  attachWorkspace(root) {
+    return registerWorkspaceTools(this.toolRegistry, root);
+  }
+
 }
