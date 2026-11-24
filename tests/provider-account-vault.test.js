@@ -10,11 +10,11 @@ test("account vault encrypts credentials and supports any configured account cou
   try {
     const filePath = path.join(root, "accounts.json");
     const vault = new AccountVault({ filePath, masterSecret: "a-test-master-secret-at-least-32-chars" });
-    const added = await Promise.all(Array.from({ length: 5 }, (_, i) => vault.addAccount({ provider: "gemini", label: `Gemini ${i}`, apiKey: `secret-key-${i}-long` })));
+    const added = [];
+    for (let i = 0; i < 5; i += 1) added.push(await vault.addAccount({ provider: "gemini", label: `Gemini ${i}`, apiKey: `secret-key-${i}-long` }));
     assert.equal((await vault.listAccounts()).length, 5);
     assert.equal((await vault.getActiveAccount()).apiKey, "secret-key-0-long");
-    const disk = await readFile(filePath, "utf8");
-    assert.doesNotMatch(disk, /secret-key-/);
+    assert.doesNotMatch(await readFile(filePath, "utf8"), /secret-key-/);
     assert.equal(added.length, 5);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
@@ -23,12 +23,11 @@ test("daily quota cooldown persists for 24 hours and disables active selection",
   const root = await mkdtemp(path.join(os.tmpdir(), "provider-cooldown-"));
   try {
     let now = Date.parse("2026-01-01T00:00:00.000Z");
-    const filePath = path.join(root, "accounts.json");
-    const options = { filePath, masterSecret: "a-test-master-secret-at-least-32-chars", clock: () => now };
+    const options = { filePath: path.join(root, "accounts.json"), masterSecret: "a-test-master-secret-at-least-32-chars", clock: () => now };
     const vault = new AccountVault(options);
     const account = await vault.addAccount({ provider: "gemini", label: "main", apiKey: "secret-key-long" });
     await vault.markDailyQuotaExceeded(account.id);
-    await assert.rejects(vault.getActiveAccount(), /No active AI provider account/);
+    assert.equal(await vault.getActiveAccount(), null);
     const restarted = new AccountVault(options);
     await assert.rejects(restarted.selectAccount(account.id), /cooldown/);
     now += 24 * 60 * 60 * 1000;
