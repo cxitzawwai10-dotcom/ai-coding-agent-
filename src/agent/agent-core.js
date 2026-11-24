@@ -326,6 +326,7 @@ export class AgentCore {
         record.result.workspaceInspection.length === 0) {
       throw new Error("Inspect workspace files before preparing coding changes.");
     }
+    const inspectedPaths = new Set(record.result.workspaceInspection.map(file => file.path));
     const seen = new Set();
     const normalized = changes.map((change, index) => {
       if (!change || typeof change !== "object" || Array.isArray(change) ||
@@ -335,6 +336,7 @@ export class AgentCore {
           Buffer.byteLength(change.content) > 1024 * 1024) {
         throw new Error(`Invalid coding change at index ${index}.`);
       }
+      if (!inspectedPaths.has(change.path)) throw new Error("Coding changes may only target paths inspected for this task.");
       if (seen.has(change.path)) throw new Error("Coding change paths must be unique.");
       seen.add(change.path);
       return { path: change.path, content: change.content };
