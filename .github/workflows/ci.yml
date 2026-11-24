@@ -35,6 +35,9 @@ jobs:
       - name: Run automated tests
         run: npm test
 
+      - name: Validate Android Termux launcher syntax
+        run: bash -n scripts/termux-start.sh
+
   docker-sandbox:
     name: Docker sandbox integration
     runs-on: ubuntu-latest
