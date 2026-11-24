@@ -46,6 +46,22 @@ test("serializes rotating refresh-token requests for a single account", async ()
   assert.equal(updated,1);
 });
 
+test("preserves previously granted scopes when the OAuth refresh response omits scope", async () => {
+  const account={id:"scope-omitted",clientId:"oaiapp_scope_omitted",scopes:["openid","chatgpt.tokens.use.direct"],expiresAt:new Date(0).toISOString(),tokens:{accessToken:"old",refreshToken:"refresh"}};
+  let savedScopes=null;
+  const store={
+    async getActiveAccount(){return {...account};},
+    async updateTokens(id,tokens,scopes){savedScopes=scopes;account.tokens={accessToken:tokens.access_token,refreshToken:tokens.refresh_token};account.expiresAt=new Date(Date.now()+Number(tokens.expires_in)*1000).toISOString();}
+  };
+  const client=new ChatGPTClient({accountStore:store,fetchImpl:async(url)=>{
+    if(url.includes("/oauth/token"))return {ok:true,json:async()=>({access_token:"new-access",refresh_token:"new-refresh",expires_in:3600})};
+    if(url.endsWith("/models"))return {ok:true,json:async()=>({models:[]})};
+    throw new Error("Unexpected URL");
+  }});
+  await client.listModels();
+  assert.deepEqual(savedScopes,["openid","chatgpt.tokens.use.direct"]);
+});
+
 test("preserves individual ChatGPT scopes after rotating refresh tokens", async () => {
   const account = { id:"scope-refresh", clientId:"oaiapp_scope", scopes:["chatgpt.tokens.use.direct"], expiresAt:new Date(0).toISOString(), tokens:{accessToken:"old",refreshToken:"refresh"} };
   let savedScopes = null;
