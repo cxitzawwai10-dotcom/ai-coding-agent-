@@ -9,7 +9,7 @@ test("uses one official endpoint family, refreshes model list per active account
   const fetchImpl = async (url, options={}) => {
     urls.push({url,options});
     if (url.endsWith("/models")) return {ok:true,json:async()=>({models:[{visibility:"list",slug:"model-a",display_name:"Model A"}]})};
-    if (url.endsWith("/responses")) return {ok:true,body:new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode('data: {"type":"response.output_text.delta","delta":"hello"}\n\ndata: {"type":"response.completed"}\n\n'));controller.close();}})};
+    if (url.endsWith("/responses")) return {ok:true,body:new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode('data: {"type":"response.output_text.delta","delta":"hello"}\n\n'));controller.enqueue(new TextEncoder().encode('data: {"type":"response.completed"}\n\n'));controller.close();}})};
     throw new Error("Unexpected URL");
   };
   const client = new ChatGPTClient({accountStore:store,fetchImpl});
