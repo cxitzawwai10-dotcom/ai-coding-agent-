@@ -106,3 +106,22 @@ test("browser API rejects non-JSON bodies and sends browser isolation headers", 
     assert.match((await response.json()).error, /Content-Type must be application\/json/);
   } finally { await app.close(); }
 });
+
+test("loopback VM deployments can explicitly disable OAuth and require credential import", async () => {
+  const token = "browser-oauth-disable-token-with-32-characters";
+  let loginCalls = 0;
+  const agent = { getStatus: () => "INITIALIZED", getTaskSummary: () => ({ total: 0 }), getTools: () => [], getTasks: () => [] };
+  const chatgptOAuth = { async beginLogin(){ loginCalls++; return { authorizationUrl: "https://auth.example.test" }; } };
+  const app = createBrowserServer({ agent, chatgptOAuth, token, host: "127.0.0.1", allowOAuth: false, port: 0 });
+  const address = await app.listen();
+  try {
+    const response = await fetch("http://127.0.0.1:" + address.port + "/api/chatgpt/login", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: "{}"
+    });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /Complete sign-in locally/);
+    assert.equal(loginCalls, 0);
+  } finally { await app.close(); }
+});
