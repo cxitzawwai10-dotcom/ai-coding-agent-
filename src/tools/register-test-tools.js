@@ -47,7 +47,7 @@ export function registerTestTools(registry, root) {
             env: testEnvironment(),
             encoding: "utf8",
             timeout: TEST_TIMEOUT_MS,
-            maxBuffer: MAX_OUTPUT,
+            maxBuffer: Math.floor(MAX_OUTPUT / 2),
             windowsHide: true,
             shell: false
           }
