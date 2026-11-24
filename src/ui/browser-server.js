@@ -17,7 +17,7 @@ export function createBrowserServer({agent,projectManager,accountVault,codingEng
    let result;
    if(request.method==="GET"&&url.pathname==="/api/status")result={status:agent.getStatus(),tasks:agent.getTaskSummary(),tools:agent.getTools()};
    else if(request.method==="GET"&&url.pathname==="/api/tasks")result=agent.getTasks();
-   else if(request.method==="GET"&&url.pathname==="/api/projects")result=await projectManager?.listProjects?.()??[];
+   else if(request.method==="GET"&&url.pathname==="/api/projects")result=await projectManager?.list?.()??[];
    else if(request.method==="GET"&&url.pathname==="/api/accounts")result=await accountVault?.listAccounts?.()??[];
    else if(request.method==="POST"&&url.pathname==="/api/accounts")result=await accountVault.addAccount(await readBody(request));
    else if(request.method==="POST"&&url.pathname==="/api/proposals")result=await codingEngine.createProposal(await readBody(request));
