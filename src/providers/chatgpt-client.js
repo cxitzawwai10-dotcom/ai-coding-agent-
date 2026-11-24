@@ -2,6 +2,7 @@ const API_BASE = "https://api.openai.com/v1";
 const PLAN_SCOPE = "chatgpt.tokens.use.direct";
 
 async function readErrorPayload(response) {
+  if (typeof response.text !== "function") return typeof response.json === "function" ? await response.json().catch(() => ({})) : {};
   const raw = await response.text().catch(() => "");
   if (!raw) return {};
   try { return JSON.parse(raw); }
