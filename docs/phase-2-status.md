@@ -6,6 +6,8 @@
 - One-time approval tokens with expiration, exact-input binding and tool-registration identity binding.
 - Bounded approval registries with expired-record cleanup.
 - Workspace listing, bounded reading and approved writing.
+- Task-scoped read-only workspace inspection that attaches source-file context to the approved execution plan.
+- Sequential registered-tool workflows with preflight validation and fail-fast execution.
 - Checked backup directory, symlink rejection, file-identity checks and atomic temporary-file writes.
 - New-file publication that refuses to overwrite a concurrently created target.
 - Primary CLI tool execution wired through user-facing consent prompts; protected operations require explicit confirmation and default-deny on rejection or input EOF.
