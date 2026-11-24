@@ -109,38 +109,36 @@ export class WorkspaceTools {
 
   async capture(relativePath) {
     const { target } = await this.resolveParent(relativePath);
-    try {
-      const st = await fs.lstat(target);
-      if (st.isSymbolicLink() || !st.isFile()) {
-        throw new Error("Transaction target must be a regular file.");
-      }
-      return { path: relativePath, existed: true, content: await this.read(relativePath) };
-    } catch (error) {
+    let st;
+    try { st = await fs.lstat(target); }
+    catch (error) {
       if (error.code === "ENOENT") return { path: relativePath, existed: false };
       throw error;
     }
+    if (st.isSymbolicLink() || !st.isFile()) {
+      throw new Error("Transaction target must be a regular file.");
+    }
+    return { path: relativePath, existed: true, content: await this.read(relativePath) };
   }
 
-  async restore(snapshot) {
-    if (!snapshot || typeof snapshot.path !== "string" || typeof snapshot.existed !== "boolean") {
-      throw new Error("Invalid workspace snapshot.");
+  async restore(snapshot, expectedIdentity) {
+    if (!snapshot || typeof snapshot.path !== "string" || typeof snapshot.existed !== "boolean" ||
+        !expectedIdentity || !Number.isSafeInteger(expectedIdentity.dev) ||
+        !Number.isSafeInteger(expectedIdentity.ino)) {
+      throw new Error("Invalid workspace rollback snapshot or identity.");
+    }
+    const { target } = await this.resolveParent(snapshot.path);
+    const current = await fs.lstat(target);
+    if (current.isSymbolicLink() || !current.isFile() ||
+        current.dev !== expectedIdentity.dev || current.ino !== expectedIdentity.ino) {
+      throw new Error("Rollback target changed after the transaction write.");
     }
     if (snapshot.existed) {
       await this.write(snapshot.path, snapshot.content);
       return { path: snapshot.path, restored: true };
     }
-    const { target } = await this.resolveParent(snapshot.path);
-    try {
-      const st = await fs.lstat(target);
-      if (st.isSymbolicLink() || !st.isFile()) {
-        throw new Error("Cannot roll back a target that is no longer a regular file.");
-      }
-      await fs.unlink(target);
-      return { path: snapshot.path, removed: true };
-    } catch (error) {
-      if (error.code === "ENOENT") return { path: snapshot.path, removed: true };
-      throw error;
-    }
+    await fs.unlink(target);
+    return { path: snapshot.path, removed: true };
   }
 
   async write(relativePath, content) {
@@ -203,7 +201,15 @@ export class WorkspaceTools {
         await fs.unlink(tempPath);
       }
       tempPath = null;
-      return { path: relativePath, written: true };
+      const committed = await fs.lstat(target);
+      if (committed.isSymbolicLink() || !committed.isFile()) {
+        throw new Error("Write target changed immediately after commit.");
+      }
+      return {
+        path: relativePath,
+        written: true,
+        identity: { dev: committed.dev, ino: committed.ino }
+      };
     } finally {
       if (temp) await temp.close().catch(() => {});
       if (backup) await backup.close().catch(() => {});
