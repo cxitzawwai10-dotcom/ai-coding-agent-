@@ -70,8 +70,7 @@ export class ChatGPTOAuth {
     const verifier = b64url(randomBytes(48));
     const challenge = b64url(sha(verifier));
     const hostId = await this.#hostId();
-    const accounts = await this.accountStore.listAccounts();
-    const existing = existingAccountId ? accounts.find(a => a.id === existingAccountId) : null;
+    const existing = existingAccountId ? await this.accountStore.getAccountForAuthorization(existingAccountId) : null;
     if (existingAccountId && !existing) throw new Error("Selected ChatGPT account was not found.");
     const params = new URLSearchParams({
       client_id: existing?.clientId || "dynamic_agent_client",
@@ -85,7 +84,10 @@ export class ChatGPTOAuth {
       ext_agent_host_id: hostId
     });
     if (!existing) params.set("agent_name_hint", "AI Coding Agent");
-    else params.set("login_hint", existing.email);
+    else {
+      params.set("login_hint", existing.email);
+      if (existing.tokens?.idToken) params.set("id_token_hint", existing.tokens.idToken);
+    }
     this.transactions.set(state, { state, nonce, verifier, redirectUri, clientId: existing?.clientId || null, accountId: existing?.id || null, hostId, createdAt: this.clock() });
     return { authorizationUrl: AUTHORIZE_URL + "?" + params.toString(), expiresInSeconds: 600 };
   }
