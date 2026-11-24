@@ -359,6 +359,33 @@ test("AgentCore refuses coding changes without inspection or per-file approval t
 });
 
 
+test("AgentCore rolls back earlier writes when a later file approval fails", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-coding-rollback-"));
+  try {
+    await fs.writeFile(path.join(root, "source.js"), "original");
+    const agent = new AgentCore();
+    agent.attachWorkspace(root);
+    const task = await agent.processTask("Update two files transactionally");
+    await agent.inspectTaskWorkspace(task.taskId, ["source.js"]);
+    agent.prepareCodingChanges(task.taskId, [
+      { path: "source.js", content: "changed" },
+      { path: "new.txt", content: "new file" }
+    ]);
+    agent.approveTask(task.taskId);
+    const changes = agent.getTask(task.taskId).result.proposedChanges;
+    const request = agent.requestToolApproval("workspace.write", changes[0]);
+    const validToken = agent.approveToolRequest(request.requestId);
+
+    const result = await agent.executeCodingChanges(task.taskId, [validToken, "invalid-token"]);
+    assert.equal(result.status, TASK_STATES.FAILED);
+    assert.match(result.error, /rolled back/i);
+    assert.equal(await fs.readFile(path.join(root, "source.js"), "utf8"), "original");
+    await assert.rejects(fs.access(path.join(root, "new.txt")));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("AgentCore runs Node workspace tests only with trusted approval after coding changes", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-coding-test-pass-"));
   try {
