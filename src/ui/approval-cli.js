@@ -24,6 +24,7 @@ export async function executeToolWithCliConsent(agent, id, input, { stdin = proc
   try {
     stdout.write("\n=== TOOL APPROVAL REQUIRED ===\n");
     stdout.write(`Tool: ${request.toolId}\n`);
+    stdout.write(`Description: ${tool.description}\n`);
     stdout.write(`Request: ${request.requestId}\n`);
     stdout.write(`Input preview:\n${JSON.stringify(request.input, null, 2)}\n`);
     stdout.write("Approve this exact operation? [y/N]: ");
