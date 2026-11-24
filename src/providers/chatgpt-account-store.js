@@ -24,7 +24,15 @@ function validate(state) {
   if (!state || state.version !== VERSION || !Array.isArray(state.accounts) || state.accounts.length > MAX_ACCOUNTS) throw new Error("ChatGPT account store has an invalid format.");
   const ids = new Set();
   for (const item of state.accounts) {
-    if (!item || typeof item.id !== "string" || ids.has(item.id) || item.issuer !== "https://auth.openai.com" || typeof item.subject !== "string" || typeof item.clientId !== "string" || typeof item.email !== "string" || !item.encryptedTokens) throw new Error("ChatGPT account store contains an invalid record.");
+    const encrypted = item?.encryptedTokens;
+    if (!item || typeof item.id !== "string" || !item.id || ids.has(item.id) ||
+        item.issuer !== "https://auth.openai.com" || typeof item.subject !== "string" || !item.subject ||
+        typeof item.clientId !== "string" || !/^oaiapp_[A-Za-z0-9_-]+$/.test(item.clientId) ||
+        typeof item.email !== "string" || !Array.isArray(item.scopes) || item.scopes.some(scope => typeof scope !== "string") ||
+        typeof item.expiresAt !== "string" || !item.extAgentHostId ||
+        !encrypted || typeof encrypted.iv !== "string" || typeof encrypted.tag !== "string" || typeof encrypted.data !== "string") {
+      throw new Error("ChatGPT account store contains an invalid record.");
+    }
     ids.add(item.id);
   }
   if (state.activeAccountId !== null && !ids.has(state.activeAccountId)) throw new Error("Active ChatGPT account does not exist.");
