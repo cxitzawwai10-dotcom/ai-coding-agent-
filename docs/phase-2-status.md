@@ -8,7 +8,7 @@
 - Workspace listing, bounded reading and approved writing.
 - Checked backup directory, symlink rejection, file-identity checks and atomic temporary-file writes.
 - New-file publication that refuses to overwrite a concurrently created target.
-- Automated unit, integration and security regression tests.
+- Primary CLI tool execution wired through user-facing consent prompts; protected operations require explicit confirmation and default-deny on rejection or input EOF.\n- Automated unit, integration and security regression tests.
 
 ## Remaining verification
 - Android device end-to-end execution.
