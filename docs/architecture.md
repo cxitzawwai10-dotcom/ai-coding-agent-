@@ -50,12 +50,12 @@ editing, debugging, testing, and persistent project memory.
 - Mark the task failed when the approved test run fails; report writes and test results distinctly.
 
 ### Workspace Test Runner
-- Register `workspace.test` when a workspace is attached.
-- Run only the fixed Node.js built-in test command (`node --test`) from the workspace root; callers cannot supply commands or arguments.
-- Require a one-time trusted approval for every test run.
-- Limit execution to 120 seconds and capture at most 1 MB of combined output.
-- Pass a reduced environment to the test process.
-- Treat test files as executable project code: approval is required, but this is not an OS-level sandbox and tests still run with the agent process user's filesystem permissions.
+- Register `workspace.test` when a workspace is attached and require one-time trusted approval.
+- Run only the fixed Node.js built-in test command (`node --test`); callers cannot supply commands or arguments.
+- Execute inside Docker with networking disabled, a read-only root filesystem and workspace snapshot, dropped Linux capabilities, no-new-privileges, a non-root UID, and CPU, memory, process, timeout, and output limits.
+- Stage a bounded snapshot that excludes VCS metadata, backup data, symlinks, and likely credential/secret files; only that snapshot is mounted into the container.
+- Require the prebuilt sandbox image to exist locally (`--pull=never`). Docker or image unavailability fails closed; the agent never falls back to host execution.
+- The Docker daemon and host kernel remain trusted parts of the security boundary. Validate the actual deployment daemon and image before production use.
 
 ### Tool Workflow Executor
 - Execute a prevalidated sequence of registered tools in order.
