@@ -471,10 +471,10 @@ export class AgentCore {
     return this.approvalManager.reject(requestId);
   }
 
-  attachWorkspace(root) {
+  attachWorkspace(root, options = {}) {
     const workspace = registerWorkspaceTools(this.toolRegistry, root);
     this.workspaceTools = workspace;
-    registerTestTools(this.toolRegistry, root);
+    registerTestTools(this.toolRegistry, root, options);
     return workspace;
   }
 
