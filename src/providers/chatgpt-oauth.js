@@ -13,7 +13,8 @@ function decodePart(value) { return JSON.parse(Buffer.from(value, "base64url").t
 function sha(value) { return createHash("sha256").update(value).digest(); }
 
 async function verifyIdToken(token, clientId, nonce, fetchImpl) {
-  const parts = String(token).split(".");
+  if (typeof token !== "string" || token.length > 65536) throw new Error("OpenAI returned an oversized or invalid ID token.");
+  const parts = token.split(".");
   if (parts.length !== 3) throw new Error("OpenAI returned a malformed ID token.");
   const header = decodePart(parts[0]);
   const claims = decodePart(parts[1]);
@@ -32,8 +33,9 @@ async function verifyIdToken(token, clientId, nonce, fetchImpl) {
   if (header.alg === "ES256") valid = verifySignature("sha256", data, { key: publicKey, dsaEncoding: "ieee-p1363" }, signature);
   const now = Math.floor(Date.now() / 1000);
   const audienceOk = Array.isArray(claims.aud) ? claims.aud.includes(clientId) && (claims.aud.length === 1 || claims.azp === clientId) : claims.aud === clientId;
-  const notYetValid = Number.isFinite(claims.nbf) && claims.nbf > now + 60;
-  if (!valid || claims.iss !== ISSUER || !audienceOk || notYetValid || !Number.isFinite(claims.exp) || claims.exp <= now || claims.nonce !== nonce || typeof claims.sub !== "string" || !claims.sub) throw new Error("OpenAI ID token validation failed.");
+  const issuedAtOk = Number.isFinite(claims.iat) && claims.iat <= now + 60;
+  const notBeforeOk = !Object.hasOwn(claims, "nbf") || (Number.isFinite(claims.nbf) && claims.nbf <= now + 60);
+  if (!valid || claims.iss !== ISSUER || !audienceOk || !issuedAtOk || !notBeforeOk || !Number.isFinite(claims.exp) || claims.exp <= now || claims.nonce !== nonce || typeof claims.sub !== "string" || !claims.sub) throw new Error("OpenAI ID token validation failed.");
   return claims;
 }
 
