@@ -9,13 +9,13 @@ It must support Burmese conversations, project management, code editing, debuggi
 - **Project Manager:** Create, list, inspect, update, and remove project metadata. Project workspace roots remain separate; removing a project record never deletes its workspace files.
 - **Project Memory:** Persist project-scoped notes, decisions, tasks, tags, and searchable context across restarts.
 - **Persistent Storage:** Atomic JSON persistence for project records, project memory, and task histories; bounded files, symlink rejection, schema validation, and single-writer deployment boundaries. Interrupted executing tasks are marked failed during restart recovery.
-- **Account Manager (Phase 4):** User-configurable provider accounts with official authentication and no quota evasion.
+- **Account Manager (Phase 4):** Encrypted multi-account Gemini/OpenAI vault, explicit selection, masked metadata, and persistent quota cooldowns; no automatic rotation.
 - **Backup and Recovery:** Preserve backups and require authorization for destructive recovery.
 - **Workspace Inspection and Approved Coding:** Inspect files, prepare bounded proposals, require per-file approval, and rollback failed transactions.
 - **Workspace Test Runner:** Fixed Node test command inside a pinned Docker sandbox; fail closed without Docker.
 - **Tool Workflow Executor:** Prevalidate tool sequences, execute sequentially, stop on failure.
 - **Safety Manager:** Approval gates, credential protection, and workspace boundaries.
-- **Burmese Chat Interface:** Burmese and English instructions, understandable progress, and clarification for ambiguity.
+- **Autonomous Coding Engine (Phase 5):** Two-step inspect-then-propose workflow, bounded changes, explicit approval, isolated tests, and rollback.\n- **Android Browser Interface (Phase 6):** Responsive browser UI and bearer-authenticated API; remote deployment requires HTTPS and protected secrets.\n- **Burmese Chat Interface:** Burmese and English instructions, understandable progress, and clarification for ambiguity.
 
 ## 3. Persistent Data
 The agent factory exposes `projectManager`, `projectMemory`, and a persistent `taskRegistry`. By default they use the workspace-local `.agent-data/` directory, which is excluded from Git. A deployment may pass a separate `dataRoot` to `createAgent`.
