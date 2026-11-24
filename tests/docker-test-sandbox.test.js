@@ -52,3 +52,30 @@ test("Docker test sandbox fails closed when Docker is unavailable", async () => 
 test("Docker sandbox rejects unsafe image references", () => {
   assert.throws(() => new DockerTestSandbox({ image: "node image; malicious" }), /Invalid sandbox image/);
 });
+
+test("Docker sandbox stages a sanitized snapshot without secrets or symlinks", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "docker-sandbox-sanitize-"));
+  let mountedRoot;
+  try {
+    await fs.writeFile(path.join(root, "source.js"), "export const safe = true;");
+    await fs.writeFile(path.join(root, ".env"), "API_KEY=must-not-enter-container");
+    await fs.writeFile(path.join(root, "service-token.txt"), "secret");
+    await fs.symlink(path.join(root, "source.js"), path.join(root, "linked.js"));
+    const sandbox = new DockerTestSandbox({
+      exec: async (_command, args) => {
+        const mount = args.find(value => value.startsWith("type=bind,src="));
+        mountedRoot = mount.split(",dst=")[0].slice("type=bind,src=".length);
+        assert.equal(await fs.readFile(path.join(mountedRoot, "source.js"), "utf8"), "export const safe = true;");
+        await assert.rejects(fs.access(path.join(mountedRoot, ".env")));
+        await assert.rejects(fs.access(path.join(mountedRoot, "service-token.txt")));
+        await assert.rejects(fs.access(path.join(mountedRoot, "linked.js")));
+        return { stdout: "ok", stderr: "" };
+      }
+    });
+    const result = await sandbox.run(root);
+    assert.equal(result.passed, true);
+    await assert.rejects(fs.access(mountedRoot));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
