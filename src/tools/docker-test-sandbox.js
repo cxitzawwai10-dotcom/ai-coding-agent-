@@ -9,7 +9,7 @@ const MAX_OUTPUT = 1024 * 1024;
 const TIMEOUT_MS = 120_000;
 const MAX_FILES = 20_000;
 const MAX_STAGED_BYTES = 250 * 1024 * 1024;
-const DEFAULT_IMAGE = "node:24-alpine";
+const DEFAULT_IMAGE = "node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85d";
 const SECRET_NAME = /^(\.env($|\.)|.*(secret|credential|token|api[-_]?key|private[-_]?key).*$|.*\.(pem|key|p12|pfx|jks)$)/i;
 const OMIT_DIRS = new Set([".git", ".agent-backups"]);
 
