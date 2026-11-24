@@ -314,7 +314,7 @@ test("AgentCore prepares inspected coding changes and applies each with trusted 
     const agent = new AgentCore();
     agent.attachWorkspace(root);
     const task = await agent.processTask("Update source.js and add a note");
-    await agent.inspectTaskWorkspace(task.taskId, ["source.js"]);
+    await agent.inspectTaskWorkspace(task.taskId, ["source.js", "notes.txt"], { allowMissing: true });
     const proposal = agent.prepareCodingChanges(task.taskId, [
       { path: "source.js", content: "export const newValue = 2;" },
       { path: "notes.txt", content: "Updated safely." }
@@ -365,8 +365,8 @@ test("AgentCore rolls back earlier writes when a later file approval fails", asy
     await fs.writeFile(path.join(root, "source.js"), "original");
     const agent = new AgentCore();
     agent.attachWorkspace(root);
+    const task = await agent.processTask("Update source and add a new file");
     await agent.inspectTaskWorkspace(task.taskId, ["source.js", "new.txt"], { allowMissing: true });
-    await agent.inspectTaskWorkspace(task.taskId, ["source.js", "new.txt"]);
     agent.prepareCodingChanges(task.taskId, [
       { path: "source.js", content: "changed" },
       { path: "new.txt", content: "new file" }
