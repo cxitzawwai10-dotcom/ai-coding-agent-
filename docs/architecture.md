@@ -22,6 +22,8 @@ The agent factory exposes `projectManager` and `projectMemory`. By default they 
 - `projects.json`: project metadata only; no workspace contents are copied or deleted.
 - `project-memory.json`: project-scoped notes, decisions, task notes, and tags.
 - `tasks.json`: task descriptions, plans/results, status history, and lifecycle recovery data. Tasks interrupted in EXECUTING state are marked FAILED on restart; they are never automatically resumed.
+- `project-memory.json`: project-scoped notes, decisions, task notes, and tags.
+- `tasks.json`: task descriptions, plans/results, status history, and lifecycle recovery data. Tasks interrupted in EXECUTING state are marked FAILED on restart; they are never automatically resumed.
 - `project-memory.json`: project-scoped memory records, tags, type, and timestamps.
 - Storage is bounded to 5 MiB per JSON store and memory entries are bounded by count and content size.
 - Persistent records are validated when loaded. Invalid JSON/schema fails closed rather than silently resetting user data.
