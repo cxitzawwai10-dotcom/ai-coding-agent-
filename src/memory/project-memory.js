@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { JsonStore } from "../storage/json-store.js";
 
 const DEFAULT_STATE = { version: 1, projects: {} };
@@ -52,7 +53,7 @@ export class ProjectMemory {
       const count = Object.values(state.projects).reduce((sum, entries) => sum + entries.length, 0);
       if (count >= MAX_ENTRIES) throw new Error("Project memory entry limit reached.");
       const entry = {
-        id: `memory-${crypto.randomUUID()}`,
+        id: `memory-${randomUUID()}`,
         projectId,
         type,
         content: content.trim(),
