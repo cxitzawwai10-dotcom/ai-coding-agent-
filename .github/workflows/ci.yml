@@ -34,3 +34,24 @@ jobs:
 
       - name: Run automated tests
         run: npm test
+
+  docker-sandbox:
+    name: Docker sandbox integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Prepare sandbox image
+        run: docker pull node:24-alpine
+
+      - name: Run real Docker isolation test
+        env:
+          AI_AGENT_DOCKER_INTEGRATION: "1"
+        run: node --test tests/docker-test-sandbox.integration.test.js
