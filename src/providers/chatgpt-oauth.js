@@ -101,7 +101,7 @@ export class ChatGPTOAuth {
     if (!response.ok) throw new Error("ChatGPT token exchange failed (HTTP " + response.status + ").");
     if (typeof tokens.id_token !== "string" || typeof tokens.access_token !== "string") throw new Error("ChatGPT token response is incomplete.");
     const claims = await verifyIdToken(tokens.id_token, clientId, tx.nonce, this.fetchImpl);
-    const scopes = String(tokens.scope || url.searchParams.get("scope") || "").split(/\s+/).filter(Boolean);
+    const scopes = String(tokens.scope || "").split(/\s+/).filter(Boolean);
     const accounts = await this.accountStore.listAccounts();
     const old = tx.accountId && accounts.find(a => a.id === tx.accountId);
     if (old && (old.subject !== claims.sub || old.clientId !== clientId)) throw new Error("Reauthorized ChatGPT identity does not match the selected account.");
