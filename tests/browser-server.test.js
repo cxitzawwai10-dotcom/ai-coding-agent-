@@ -36,6 +36,27 @@ test("account switching cancels active requests and refreshes models on the fixe
   } finally { await app.close(); }
 });
 
+test("OAuth callback is reconstructed with the exact 127.0.0.1 listener port", async () => {
+  const token="browser-callback-token-with-more-than-32-characters";
+  let receivedUrl=null, cancelled=0;
+  const agent={getStatus:()=>"INITIALIZED",getTaskSummary:()=>({total:0}),getTools:()=>[],getTasks:()=>[]};
+  const chatgptOAuth={async handleCallback(value){receivedUrl=value;return {id:"connected"};}};
+  const providerClient={cancelActiveRequests(){cancelled++;}};
+  const app=createBrowserServer({agent,chatgptOAuth,providerClient,token,port:0});
+  const address=await app.listen();
+  try{
+    const response=await fetch("http://127.0.0.1:"+address.port+"/auth/openai/callback?state=callback-state");
+    assert.equal(response.status,200);
+    const callback=new URL(receivedUrl);
+    assert.equal(callback.protocol,"http:");
+    assert.equal(callback.hostname,"127.0.0.1");
+    assert.equal(callback.port,String(address.port));
+    assert.equal(callback.pathname,"/auth/openai/callback");
+    assert.equal(callback.searchParams.get("state"),"callback-state");
+    assert.equal(cancelled,1);
+  }finally{await app.close();}
+});
+
 test("browser API supports encrypted credential export and host-bound import", async () => {
   const calls=[];
   const token="browser-api-token-with-more-than-32-characters";
