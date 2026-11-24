@@ -10,7 +10,8 @@ OpenAI documents a supported self-hosted-VM path: complete OAuth locally with th
 ## Environment
 - AI_AGENT_VAULT_KEY: high-entropy secret, at least 32 characters; encrypts OAuth tokens at rest.
 - AI_AGENT_ACCESS_TOKEN: separate high-entropy local browser API bearer token, at least 32 characters.
-- AI_AGENT_HOST: keep 127.0.0.1 for the supported local loopback flow. Remote binding disables ChatGPT OAuth.
+- AI_AGENT_HOST: keep 127.0.0.1 for local loopback mode and for a VM behind a loopback-only HTTPS reverse proxy.
+- AI_AGENT_ALLOW_OAUTH: set false on the VM to disable OAuth even when the server binds to 127.0.0.1; local Android sign-in keeps it true.
 - PORT: optional port, default 8787.
 - Node.js 24 or newer.
 - A persistent writable .agent-data directory.
