@@ -102,11 +102,12 @@ export class ChatGPTClient {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true }).replace(/\\r\\n/g, "\\n");
+        buffer += decoder.decode(value, { stream: true });
+        buffer = buffer.replace(/\r\n/g, "\n");
         let split;
-        while ((split = buffer.indexOf("\\n\\n")) >= 0) {
+        while ((split = buffer.indexOf("\n\n")) >= 0) {
           const frame = buffer.slice(0, split); buffer = buffer.slice(split + 2);
-          const data = frame.split("\\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("\\n");
+          const data = frame.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("\n");
           if (!data || data === "[DONE]") continue;
           let event; try { event = JSON.parse(data); } catch { continue; }
           if (event.type === "response.output_text.delta") output += event.delta || "";
