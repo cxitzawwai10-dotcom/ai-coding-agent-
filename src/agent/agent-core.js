@@ -3,6 +3,7 @@ import { TaskLifecycle, TASK_STATES } from "./task-lifecycle.js";
 import { TaskRegistry } from "./task-registry.js";
 import { ToolRegistry } from "../tools/tool-registry.js";
 import { registerWorkspaceTools } from "../tools/register-workspace-tools.js";
+import { registerTestTools } from "../tools/register-test-tools.js";
 import { ApprovalManager } from "../safety/approval-manager.js";
 
 export class AgentCore {
@@ -334,7 +335,7 @@ export class AgentCore {
     };
   }
 
-  async executeCodingChanges(taskId, approvalTokens) {
+  async executeCodingChanges(taskId, approvalTokens, testApprovalToken = null) {
     const record = this.registry.get(taskId);
     if (!record || !this.lifecycles.has(taskId)) throw new Error("Task not found.");
     if (record.status !== TASK_STATES.WAITING_FOR_APPROVAL) {
@@ -359,9 +360,33 @@ export class AgentCore {
         );
         results.push({ index, path: change.path, result });
       }
+      let tests = null;
+      if (testApprovalToken !== null) {
+        if (typeof testApprovalToken !== "string" || !testApprovalToken) {
+          throw new Error("A trusted approval token is required to run workspace tests.");
+        }
+        if (!this.toolRegistry.get("workspace.test")) {
+          throw new Error("Workspace test tool is not registered.");
+        }
+        tests = await this.executeTool(
+          "workspace.test",
+          {},
+          { approvalToken: testApprovalToken }
+        );
+        if (!tests.passed) {
+          const details = [tests.error, tests.stderr, tests.stdout]
+            .filter(Boolean)
+            .join("\n")
+            .slice(0, 4000);
+          throw new Error("Workspace tests failed after " + results.length + " file change(s). " + details);
+        }
+      }
       return {
         changesApplied: results.length,
-        verification: "Writes completed; automated test execution is not yet configured.",
+        verification: tests
+          ? "All workspace tests passed after the approved file changes."
+          : "File writes completed; automated tests were not requested.",
+        tests,
         results
       };
     });
@@ -423,7 +448,9 @@ export class AgentCore {
   }
 
   attachWorkspace(root) {
-    return registerWorkspaceTools(this.toolRegistry, root);
+    const workspace = registerWorkspaceTools(this.toolRegistry, root);
+    registerTestTools(this.toolRegistry, root);
+    return workspace;
   }
 
 }
