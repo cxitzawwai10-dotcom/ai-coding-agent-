@@ -49,7 +49,7 @@ export function createBrowserServer({agent,projectManager,accountStore,chatgptOA
   response.setHeader("x-content-type-options","nosniff");response.setHeader("cache-control","no-store");response.setHeader("referrer-policy","no-referrer");response.setHeader("x-frame-options","DENY");response.setHeader("permissions-policy","camera=(), microphone=(), geolocation=()");response.setHeader("cross-origin-resource-policy","same-origin");
   const url=new URL(request.url,"http://localhost");
   if(request.method==="GET"&&url.pathname==="/"){response.writeHead(200,{"content-type":"text/html; charset=utf-8","content-security-policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"});response.end(HTML);return;}
-  if(request.method==="GET"&&url.pathname==="/auth/openai/callback"){
+  if(request.method==="GET"&&url.pathname==="/auth/callback"){
    try{
     if(!allowOAuth||host!=="127.0.0.1")throw new Error("ChatGPT plan OAuth is available only when explicitly enabled on the local 127.0.0.1 loopback server.");
     if(!chatgptOAuth)throw new Error("Configure AI_AGENT_VAULT_KEY before connecting ChatGPT.");
