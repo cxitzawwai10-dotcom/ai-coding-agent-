@@ -1,17 +1,19 @@
 # Workspace Tools
 
-WorkspaceTools provides safe access to project files.
+WorkspaceTools provides bounded access to project files.
 
 ## Features
 - List workspace directory entries.
-- Read UTF-8 text files.
-- Resolve paths inside the configured workspace.
-- Reject paths outside the workspace.
-- Limit file reads to 1 MB.
+- Read UTF-8 text files with a 1 MB maximum.
+- Write UTF-8 text files with a 1 MB maximum.
+- Reject symbolic-link targets and parent components.
+- Back up existing files in a checked .agent-backups directory.
+- Use exclusive temporary files and atomic rename for writes.
 
 ## API
-- `new WorkspaceTools(root)`
-- `list(relativePath = ".")`
-- `read(relativePath)`
+- new WorkspaceTools(root)
+- list(relativePath = ".")
+- read(relativePath)
+- write(relativePath, content)
 
-File modification tools will be added only with an explicit approval mechanism.
+Writes require trusted approval. Portable Node.js path APIs reduce filesystem race risks but do not eliminate every TOCTOU race.
