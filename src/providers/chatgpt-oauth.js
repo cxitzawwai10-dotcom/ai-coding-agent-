@@ -140,7 +140,13 @@ export class ChatGPTOAuth {
     const form = new URLSearchParams({ grant_type: "authorization_code", client_id: clientId, code, code_verifier: tx.verifier, redirect_uri: tx.redirectUri, resource: RESOURCE });
     const response = await this.fetchImpl(TOKEN_URL, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, body: form.toString() });
     const tokens = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error("ChatGPT token exchange failed (HTTP " + response.status + ").");
+    if (!response.ok) {
+      const rawError = tokens.error;
+      const code = (typeof rawError === "object" ? rawError?.code : rawError) || tokens.code;
+      const detail = (typeof rawError === "object" ? rawError?.message : null) || tokens.detail || tokens.message || "";
+      const requestId = response.headers?.get?.("x-request-id");
+      throw new Error("ChatGPT token exchange failed (HTTP " + response.status + (code ? "; code=" + code : "") + (requestId ? "; request_id=" + requestId : "") + ")." + (detail ? " " + String(detail).slice(0, 1000) : ""));
+    }
     if (typeof tokens.id_token !== "string" || typeof tokens.access_token !== "string") throw new Error("ChatGPT token response is incomplete.");
     const claims = await verifyIdToken(tokens.id_token, clientId, tx.nonce, this.fetchImpl);
     const scopes = String(tokens.scope || "").split(/\s+/).filter(Boolean);
