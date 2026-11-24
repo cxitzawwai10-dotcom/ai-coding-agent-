@@ -35,6 +35,11 @@ editing, debugging, testing, and persistent project memory.
 - Support recovery from verified backups.
 - Never overwrite backups without authorization.
 
+### Workspace Inspection
+- Inspect up to 20 unique workspace files for a planned task using the bounded read-only tool.
+- Attach inspected file contents to the task plan as execution context.
+- Reject inspection after task approval or outside the planned state.
+
 ### Tool Workflow Executor
 - Execute a prevalidated sequence of registered tools in order.
 - Require task-level approval before a task workflow starts.
