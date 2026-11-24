@@ -40,6 +40,12 @@ editing, debugging, testing, and persistent project memory.
 - Attach inspected file contents to the task plan as execution context.
 - Reject inspection after task approval or outside the planned state.
 
+### Approved Coding Change Workflow
+- Require workspace inspection before preparing a bounded change proposal.
+- Bind each proposed file path and content to its own one-time trusted approval token.
+- Apply changes through the protected workspace write tool only after task approval.
+- Report completed writes separately from automated test verification; test execution is not yet configured.
+
 ### Tool Workflow Executor
 - Execute a prevalidated sequence of registered tools in order.
 - Require task-level approval before a task workflow starts.
