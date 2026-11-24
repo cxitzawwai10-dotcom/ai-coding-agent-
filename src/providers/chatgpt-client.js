@@ -38,7 +38,7 @@ export class ChatGPTClient {
           throw new Error("ChatGPT session refresh failed (HTTP " + response.status + "). " + (code || "Reconnect the account if the session has expired."));
         }
         if (!refreshed.refresh_token || !Number.isFinite(Number(refreshed.expires_in))) throw new Error("ChatGPT refresh response did not include a replacement refresh token and expiry.");
-        await this.accountStore.updateTokens(account.id, refreshed);
+        await this.accountStore.updateTokens(account.id, refreshed, String(refreshed.scope || "").split(/\\s+/).filter(Boolean));
         return refreshed.access_token;
       })();
       this.refreshes.set(account.id, refreshPromise);
