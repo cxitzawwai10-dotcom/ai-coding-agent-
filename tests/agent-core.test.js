@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { AgentCore } from "../src/agent/agent-core.js";
 import { TASK_STATES } from "../src/agent/task-lifecycle.js";
 
@@ -258,4 +261,48 @@ test("AgentCore stops a tool sequence after a tool fails", async () => {
   assert.equal(result.status, TASK_STATES.FAILED);
   assert.equal(result.error, "step failed");
   assert.deepEqual(order, ["break"]);
+});
+
+test("AgentCore inspects workspace files before approved coding execution", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-task-inspect-"));
+  try {
+    await fs.writeFile(path.join(root, "source.js"), "export const value = 1;");
+    const agent = new AgentCore();
+    agent.attachWorkspace(root);
+    const task = await agent.processTask("Update source.js safely");
+
+    const inspection = await agent.inspectTaskWorkspace(task.taskId, ["source.js"]);
+    assert.equal(inspection.inspectedFiles, 1);
+    assert.equal(inspection.files[0].content, "export const value = 1;");
+
+    agent.approveTask(task.taskId);
+    const executed = await agent.executeTask(task.taskId, async context => {
+      assert.equal(context.plan.workspaceInspection[0].path, "source.js");
+      assert.equal(context.plan.workspaceInspection[0].content, "export const value = 1;");
+      return "inspection context verified";
+    });
+    assert.equal(executed.status, TASK_STATES.COMPLETED);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("AgentCore rejects workspace inspection for unplanned tasks and invalid paths", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "agent-task-inspect-invalid-"));
+  try {
+    const agent = new AgentCore();
+    agent.attachWorkspace(root);
+    const task = await agent.processTask("Inspect safely");
+    await assert.rejects(
+      agent.inspectTaskWorkspace(task.taskId, [""]),
+      /unique non-empty strings/
+    );
+    agent.approveTask(task.taskId);
+    await assert.rejects(
+      agent.inspectTaskWorkspace(task.taskId, ["missing.js"]),
+      /only allowed for planned tasks/
+    );
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
 });
