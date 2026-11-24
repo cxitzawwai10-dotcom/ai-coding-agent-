@@ -45,13 +45,13 @@ test("OAuth callback is reconstructed with the exact 127.0.0.1 listener port", a
   const app=createBrowserServer({agent,chatgptOAuth,providerClient,token,port:0});
   const address=await app.listen();
   try{
-    const response=await fetch("http://127.0.0.1:"+address.port+"/auth/openai/callback?state=callback-state");
+    const response=await fetch("http://127.0.0.1:"+address.port+"/auth/callback?state=callback-state");
     assert.equal(response.status,200);
     const callback=new URL(receivedUrl);
     assert.equal(callback.protocol,"http:");
     assert.equal(callback.hostname,"127.0.0.1");
     assert.equal(callback.port,String(address.port));
-    assert.equal(callback.pathname,"/auth/openai/callback");
+    assert.equal(callback.pathname,"/auth/callback");
     assert.equal(callback.searchParams.get("state"),"callback-state");
     assert.equal(cancelled,1);
   }finally{await app.close();}
