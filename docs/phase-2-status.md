@@ -12,7 +12,7 @@
 
 ## Remaining verification
 - Android device end-to-end execution.
-- User-facing consent UI integration.
+- User-facing CLI consent flow wired into the primary application entrypoint (`node src/index.js --tool <id> --input '<json>'`).
 - Broader filesystem race testing under concurrent hostile modification; path-based Node.js APIs still leave a narrow parent-directory TOCTOU limitation.
 
 Portable Node.js path operations reduce but cannot completely eliminate all parent-directory TOCTOU races. Automated test success does not by itself establish production security.
