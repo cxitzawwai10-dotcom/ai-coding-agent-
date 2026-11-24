@@ -94,17 +94,15 @@ editing, debugging, testing, and persistent project memory.
 - Follow provider authentication and service terms.
 - Do not use account switching to bypass quotas.
 - Ask for approval before destructive operations.
-- Do not treat approval-gated project tests as sandboxed code.
+- Require both trusted approval and the Docker isolation boundary for project-controlled test execution; never fall back to host execution.
 
 ## 5. Development Phases
-1. Project foundation and architecture.
-2. Agent Core.
-3. Project Manager and workspace operations.
-4. Safety and backup systems.
-5. Persistent project memory.
-6. Account Manager and provider integration.
-7. Burmese Chat Interface.
-8. Integration tests and Android usability checks.
+1. Project foundation and repository architecture.
+2. Agent Core, workspace tools, approval security, test isolation, and rollback.
+3. Persistent project memory and project management.
+4. AI provider integrations and user-configurable account management.
+5. Autonomous coding engine, planning, editing, debugging, and verification.
+6. Android browser interface, hosted backend integration, and end-to-end release checks.
 
 ## 6. Testing
 - Use Node.js built-in test runner.
