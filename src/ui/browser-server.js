@@ -60,7 +60,7 @@ export function createBrowserServer({agent,projectManager,accountStore,chatgptOA
     const body=await readBody(request);providerClient?.cancelActiveRequests();const account=await accountStore.selectAccount(body.id);const models=await providerClient.listModels();result={account,models,endpoint:"https://api.openai.com/v1"};
    }
    else if(request.method==="GET"&&url.pathname==="/api/chatgpt/models")result=await providerClient.listModels();
-   else if(request.method==="DELETE"&&url.pathname.startsWith("/api/chatgpt/accounts/")){const id=decodeURIComponent(url.pathname.slice("/api/chatgpt/accounts/".length));providerClient?.cancelActiveRequests();result={removed:await accountStore.removeAccount(id)};}
+   else if(request.method==="DELETE"&&url.pathname.startsWith("/api/chatgpt/accounts/")){const id=decodeURIComponent(url.pathname.slice("/api/chatgpt/accounts/".length));providerClient?.cancelActiveRequests();result=chatgptOAuth?await chatgptOAuth.revokeAccount(id):{removed:await accountStore.removeAccount(id),remoteRevocationConfirmed:false};}
    else if(request.method==="POST"&&url.pathname==="/api/proposals")result=await codingEngine.createProposal(await readBody(request));
    else if(request.method==="POST"&&/^\/api\/tasks\/[^/]+\/approve-execute$/.test(url.pathname)){
     await readBody(request);const taskId=decodeURIComponent(url.pathname.split("/")[3]);const record=agent.getTask(taskId);const changes=record?.result?.proposedChanges;
