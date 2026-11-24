@@ -9,7 +9,7 @@ function createAgent() {
   const agent = {
     calls,
     rejected: [],
-    getTools: () => [{ id: "workspace.write", requiresApproval: true }],
+    getTools: () => [{ id: "workspace.write", description: "Write a file in the workspace.", requiresApproval: true }],
     requestToolApproval: (id, input) => ({ requestId: "request-1", toolId: id, input }),
     approveToolRequest: () => "one-time-token",
     rejectToolRequest: requestId => { agent.rejected.push(requestId); return true; },
@@ -18,6 +18,7 @@ function createAgent() {
       return "written";
     }
   };
+  return agent;
 }
 
 test("CLI consent denies execution unless user enters y", async () => {
