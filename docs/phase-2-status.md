@@ -8,6 +8,7 @@
 - Workspace listing, bounded reading and approved writing.
 - Task-scoped read-only workspace inspection that attaches source-file context to the approved execution plan.
 - Inspected coding change proposals and sequential file writes requiring a separate one-time approval token for every file.
+- Transaction-style coding execution snapshots every target before writes and rolls back applied changes in reverse order when a later write approval or post-write test fails; rollback checks the identity of each file written by the transaction before restoring or removing it.
 - Approval-gated `workspace.test` tool using the fixed Node.js built-in test runner, a 120-second timeout, and bounded output.
 - Optional post-write test execution inside the coding task, requiring its own one-time test approval; a failing test run marks the task failed.
 - Sequential registered-tool workflows with preflight validation and fail-fast execution.
