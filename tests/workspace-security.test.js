@@ -69,3 +69,47 @@ test("workspace write rejects content larger than 1 MB", async () => {
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("workspace concurrent writes never publish partial file contents", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "workspace-concurrent-write-"));
+  try {
+    const workspace = new WorkspaceTools(root);
+    const candidates = Array.from({ length: 12 }, (_, index) =>
+      `writer-${index}-${"x".repeat(32 * 1024)}`
+    );
+
+    const results = await Promise.allSettled(
+      candidates.map(content => workspace.write("shared.txt", content))
+    );
+
+    assert.ok(results.some(result => result.status === "fulfilled"));
+    const finalContent = await fs.readFile(path.join(root, "shared.txt"), "utf8");
+    assert.ok(candidates.includes(finalContent), "final file must equal one complete writer payload");
+
+    const entries = await fs.readdir(root);
+    assert.ok(!entries.some(name => name.startsWith(".agent-") && name.endsWith(".tmp")),
+      "temporary files must be cleaned up after concurrent writes");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("workspace write backup preserves the complete previous file", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "workspace-backup-content-"));
+  try {
+    const target = path.join(root, "existing.txt");
+    const previousContent = "original content that must remain recoverable";
+    await fs.writeFile(target, previousContent);
+
+    const workspace = new WorkspaceTools(root);
+    await workspace.write("existing.txt", "replacement content");
+
+    assert.equal(await fs.readFile(target, "utf8"), "replacement content");
+    const backupDir = path.join(root, ".agent-backups");
+    const backups = (await fs.readdir(backupDir)).filter(name => name.endsWith(".bak"));
+    assert.equal(backups.length, 1);
+    assert.equal(await fs.readFile(path.join(backupDir, backups[0]), "utf8"), previousContent);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
