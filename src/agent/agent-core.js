@@ -400,9 +400,9 @@ export class AgentCore {
         };
       } catch (error) {
         const rollbackErrors = [];
-        for (const snapshot of snapshots.slice(0, results.length).reverse()) {
+        for (let index = results.length - 1; index >= 0; index -= 1) {
           try {
-            await this.workspaceTools.restore(snapshot);
+            await this.workspaceTools.restore(snapshots[index], results[index].result?.identity);
           } catch (rollbackError) {
             rollbackErrors.push(rollbackError instanceof Error ? rollbackError.message : String(rollbackError));
           }
