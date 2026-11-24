@@ -63,6 +63,28 @@ test("preserves individual ChatGPT scopes after rotating refresh tokens", async 
   assert.ok(account.scopes.includes("chatgpt.tokens.use.direct"));
 });
 
+test("persists rotated tokens but blocks inference if refreshed scopes revoke plan usage", async () => {
+  const account = { id:"scope-revoked", clientId:"oaiapp_scope_revoked", scopes:["chatgpt.tokens.use.direct"], expiresAt:new Date(0).toISOString(), tokens:{accessToken:"old",refreshToken:"refresh"} };
+  let savedScopes = null;
+  const store = {
+    async getActiveAccount(){return {...account};},
+    async updateTokens(id,tokens,scopes){
+      savedScopes=scopes;
+      account.tokens={accessToken:tokens.access_token,refreshToken:tokens.refresh_token};
+      account.expiresAt=new Date(Date.now()+Number(tokens.expires_in)*1000).toISOString();
+      account.scopes=scopes;
+    }
+  };
+  const client = new ChatGPTClient({accountStore:store,fetchImpl:async(url)=>{
+    if(url.includes("/oauth/token")) return {ok:true,json:async()=>({access_token:"rotated-access",refresh_token:"rotated-refresh",expires_in:3600,scope:"openid profile"})};
+    throw new Error("Inference or model request must not run after plan permission is removed.");
+  }});
+  await assert.rejects(client.listModels(),/no longer grants plan-usage permission/);
+  assert.deepEqual(savedScopes,["openid","profile"]);
+  assert.equal(account.tokens.accessToken,"rotated-access");
+  assert.equal(account.tokens.refreshToken,"rotated-refresh");
+});
+
 test("clears a terminally revoked refresh token without switching accounts", async () => {
   let cleared = null;
   const account = {id:"revoked",clientId:"oaiapp_revoked",scopes:["chatgpt.tokens.use.direct"],expiresAt:new Date(0).toISOString(),tokens:{accessToken:"old",refreshToken:"revoked"}};
