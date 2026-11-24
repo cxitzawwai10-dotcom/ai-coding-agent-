@@ -7,9 +7,9 @@ import path from "node:path";
 import { ChatGPTOAuth } from "../src/providers/chatgpt-oauth.js";
 
 function encode(value) { return Buffer.from(JSON.stringify(value)).toString("base64url"); }
-function makeIdToken(privateKey, clientId, nonce) {
+function makeIdToken(privateKey, clientId, nonce, extraClaims = {}) {
   const header = encode({ alg: "RS256", typ: "JWT", kid: "test-key" });
-  const claims = encode({ iss: "https://auth.openai.com", aud: clientId, sub: "account-subject", email: "person@example.test", name: "Person", exp: Math.floor(Date.now()/1000)+3600, iat: Math.floor(Date.now()/1000), nonce });
+  const claims = encode({ iss: "https://auth.openai.com", aud: clientId, sub: "account-subject", email: "person@example.test", name: "Person", exp: Math.floor(Date.now()/1000)+3600, iat: Math.floor(Date.now()/1000), nonce, ...extraClaims });
   const input = header + "." + claims;
   return input + "." + sign("RSA-SHA256", Buffer.from(input), privateKey).toString("base64url");
 }
@@ -87,4 +87,31 @@ test("revokes the renewable ChatGPT session before removing an account", async (
   assert.equal(form.get("token"),"refresh-secret");
   assert.equal(form.get("token_type_hint"),"refresh_token");
   assert.equal(form.get("client_id"),"oaiapp_revoke");
+});
+
+test("rejects ID tokens with missing issued-at, malformed not-before, or excessive size", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "chatgpt-oauth-claims-"));
+  try {
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const scenarios = [
+      { name: "missing iat", make: (nonce) => makeIdToken(privateKey, "oaiapp_claims", nonce, { iat: undefined }) },
+      { name: "malformed nbf", make: (nonce) => makeIdToken(privateKey, "oaiapp_claims", nonce, { nbf: "tomorrow" }) },
+      { name: "oversized token", make: () => "x".repeat(65537) }
+    ];
+    for (const scenario of scenarios) {
+      let currentToken = "";
+      const accountStore = { async listAccounts(){return [];}, async saveVerifiedAccount(){throw new Error("must not save an invalid ID token");} };
+      const fetchImpl = async (url) => {
+        if (url === "https://auth.openai.com/api/accounts/oauth/token") return { ok: true, async json(){return { id_token: currentToken, access_token: "access", refresh_token: "refresh", expires_in: 3600, scope: "openid" };} };
+        if (url === "https://auth.openai.com/.well-known/jwks.json") return { ok: true, async json(){return { keys: [{ ...publicKey.export({format:"jwk"}), kid:"test-key", use:"sig", alg:"RS256" }] };} };
+        throw new Error("Unexpected OAuth URL");
+      };
+      const oauth = new ChatGPTOAuth({ accountStore, hostIdPath: path.join(dir, scenario.name.replaceAll(" ", "-") + ".json"), fetchImpl });
+      const start = await oauth.beginLogin({ redirectUri: "http://127.0.0.1:1455/auth/openai/callback" });
+      const auth = new URL(start.authorizationUrl);
+      currentToken = scenario.make(auth.searchParams.get("nonce"));
+      const callback = "http://127.0.0.1:1455/auth/openai/callback?code=valid&client_id=oaiapp_claims&state=" + encodeURIComponent(auth.searchParams.get("state"));
+      await assert.rejects(oauth.handleCallback(callback), scenario.name === "oversized token" ? /oversized/ : /validation failed/, scenario.name);
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });
