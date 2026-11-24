@@ -16,6 +16,7 @@ OpenAI documents a supported self-hosted-VM path: complete OAuth locally with th
 - Node.js 24 or newer.
 - A persistent writable .agent-data directory.
 - Docker Engine access for the isolated workspace test runner.
+- Browser API: requires a separate bearer token, rate-limits repeated invalid tokens, rejects non-JSON request bodies, and sends browser isolation headers.
 
 Never commit secrets or OAuth credentials. Do not put tokens in project memory, task descriptions, or logs. Back up the encrypted account data and vault key separately.
 
