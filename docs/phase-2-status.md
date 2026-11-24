@@ -8,6 +8,8 @@
 - Workspace listing, bounded reading and approved writing.
 - Task-scoped read-only workspace inspection that attaches source-file context to the approved execution plan.
 - Inspected coding change proposals and sequential file writes requiring a separate one-time approval token for every file.
+- Approval-gated `workspace.test` tool using the fixed Node.js built-in test runner, a 120-second timeout, and bounded output.
+- Optional post-write test execution inside the coding task, requiring its own one-time test approval; a failing test run marks the task failed.
 - Sequential registered-tool workflows with preflight validation and fail-fast execution.
 - Checked backup directory, symlink rejection, file-identity checks and atomic temporary-file writes.
 - New-file publication that refuses to overwrite a concurrently created target.
@@ -17,5 +19,6 @@
 ## Remaining verification
 - Android device end-to-end execution.
 - Broader filesystem race testing under concurrent hostile modification; path-based Node.js APIs still leave a narrow parent-directory TOCTOU limitation.
+- Evaluate an OS-level sandbox for executing untrusted project test code. The current approval-gated test runner is not a sandbox and runs tests with the agent process user's filesystem permissions.
 
 Portable Node.js path operations reduce but cannot completely eliminate all parent-directory TOCTOU races. Automated test success does not by itself establish production security.
