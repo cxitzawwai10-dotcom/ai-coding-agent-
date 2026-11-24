@@ -54,7 +54,7 @@ export class ChatGPTAccountStore {
     return op;
   }
   #public(item) {
-    return { id: item.id, email: item.email, name: item.name, subject: item.subject, clientId: item.clientId, scopes: [...item.scopes], planUsageEnabled: item.scopes.includes(REQUIRED_SCOPE), expiresAt: item.expiresAt, isActive: this.state.activeAccountId === item.id };
+    return { id: item.id, email: item.email, name: item.name, subject: item.subject, clientId: item.clientId, scopes: [...item.scopes], planUsageEnabled: item.scopes.includes(REQUIRED_SCOPE), needsReauth: item.needsReauth === true, expiresAt: item.expiresAt, isActive: this.state.activeAccountId === item.id };
   }
   async saveVerifiedAccount({ issuer, subject, clientId, email, name = "", idToken, tokens, scopes, extAgentHostId }) {
     if (issuer !== "https://auth.openai.com" || !subject || !/^oaiapp_[A-Za-z0-9_-]+$/.test(clientId) || typeof email !== "string" || !idToken || !tokens?.access_token || !Array.isArray(scopes) || !extAgentHostId) throw new Error("Verified ChatGPT account data is incomplete.");
@@ -71,12 +71,19 @@ export class ChatGPTAccountStore {
       item.scopes = [...new Set(scopes)];
       item.expiresAt = new Date(Date.now() + Math.max(0, Number(tokens.expires_in) || 0) * 1000).toISOString();
       item.encryptedTokens = seal({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token || null, idToken }, this.key);
+      item.needsReauth = false;
       next.activeAccountId = item.id;
       return item;
     });
     return this.#public(account);
   }
   async listAccounts() { await this.queue; await this.ready; return this.state.accounts.map(item => this.#public(item)); }
+  async getAccountForAuthorization(id) {
+    await this.queue; await this.ready;
+    const item = this.state.accounts.find(a => a.id === id);
+    if (!item) return null;
+    return { ...this.#public(item), tokens: unseal(item.encryptedTokens, this.key), extAgentHostId: item.extAgentHostId };
+  }
   async getActiveAccount() {
     await this.queue; await this.ready;
     const item = this.state.accounts.find(a => a.id === this.state.activeAccountId);
@@ -100,6 +107,17 @@ export class ChatGPTAccountStore {
       return next.accounts.length !== old;
     });
   }
+  async clearCredentials(id) {
+    return this.#mutate(next => {
+      const found = next.accounts.find(a => a.id === id);
+      if (!found) throw new Error("ChatGPT account not found.");
+      const previous = unseal(found.encryptedTokens, this.key);
+      found.encryptedTokens = seal({ accessToken: "", refreshToken: null, idToken: previous.idToken }, this.key);
+      found.expiresAt = new Date(0).toISOString();
+      found.needsReauth = true;
+      return this.#public(found);
+    });
+  }
   async updateTokens(id, tokens, scopes) {
     const item = await this.#mutate(next => {
       const found = next.accounts.find(a => a.id === id);
@@ -107,6 +125,7 @@ export class ChatGPTAccountStore {
       const previous = unseal(found.encryptedTokens, this.key);
       found.encryptedTokens = seal({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token || previous.refreshToken, idToken: previous.idToken }, this.key);
       found.expiresAt = new Date(Date.now() + Math.max(0, Number(tokens.expires_in) || 0) * 1000).toISOString();
+      found.needsReauth = false;
       if (Array.isArray(scopes) && scopes.length) found.scopes = [...new Set(scopes)];
       return found;
     });
