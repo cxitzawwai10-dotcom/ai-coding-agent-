@@ -1,100 +1,38 @@
 # AI Coding Agent - Architecture
 
 ## 1. Project Goal
-Build an AI Coding Agent that can be operated from Android without requiring Termux or a local PC setup.
-It must support Burmese conversations, project management, code
-editing, debugging, testing, and persistent project memory.
+Build an AI Coding Agent that can be operated from an Android browser without requiring Termux or a local PC setup.
+It must support Burmese conversations, project management, code editing, debugging, testing, and persistent project memory.
 
 ## 2. Core Modules
+- **Agent Core:** Understand tasks, plan, coordinate tools, and report verified results.
+- **Project Manager:** Create, list, inspect, update, and remove project metadata. Project workspace roots remain separate; removing a project record never deletes its workspace files.
+- **Project Memory:** Persist project-scoped notes, decisions, tasks, tags, and searchable context across restarts.
+- **Persistent Storage:** Atomic JSON writes, bounded storage, symlink rejection, schema validation, and serialized in-process writes.
+- **Account Manager (Phase 4):** User-configurable provider accounts with official authentication and no quota evasion.
+- **Backup and Recovery:** Preserve backups and require authorization for destructive recovery.
+- **Workspace Inspection and Approved Coding:** Inspect files, prepare bounded proposals, require per-file approval, and rollback failed transactions.
+- **Workspace Test Runner:** Fixed Node test command inside a pinned Docker sandbox; fail closed without Docker.
+- **Tool Workflow Executor:** Prevalidate tool sequences, execute sequentially, stop on failure.
+- **Safety Manager:** Approval gates, credential protection, and workspace boundaries.
+- **Burmese Chat Interface:** Burmese and English instructions, understandable progress, and clarification for ambiguity.
 
-### Agent Core
-- Understand user instructions.
-- Plan and execute coding tasks.
-- Coordinate tools and project modules.
-- Report actual results and errors.
-
-### Account Manager
-- Support a user-configurable number of accounts.
-- Add, remove, inspect, and select accounts.
-- Keep account data isolated.
-- Use only officially supported authentication.
-- Never rotate accounts to evade quotas or usage limits.
-
-### Project Manager
-- Create and manage multiple projects.
-- Maintain separate project workspaces.
-- Inspect files before making changes.
-
-### Project Memory
-- Persist project decisions and progress locally.
-- Store task history and handover notes.
-- Resume work after application restarts.
-
-### Backup and Recovery
-- Back up important files before significant changes.
-- Support recovery from verified backups.
-- Never overwrite backups without authorization.
-
-### Workspace Inspection
-- Inspect up to 20 unique workspace files for a planned task using the bounded read-only tool.
-- Attach inspected file contents to the task plan as execution context.
-- Reject inspection after task approval or outside the planned state.
-
-### Approved Coding Change Workflow
-- Require workspace inspection before preparing a bounded change proposal.
-- Bind each proposed file path and content to its own one-time trusted approval token.
-- Apply changes through the protected workspace write tool only after task approval.
-- Capture every target's prior state before applying changes; on a later write or test failure, restore applied files in reverse order and remove newly created files only when their post-write file identity still matches.
-- Report incomplete rollback explicitly instead of claiming the workspace was restored.
-- Optionally run the workspace test suite after writes, with a separate one-time test approval.
-- Mark the task failed when the approved test run fails; report writes and test results distinctly.
-
-### Workspace Test Runner
-- Register `workspace.test` when a workspace is attached and require one-time trusted approval.
-- Run only the fixed Node.js built-in test command (`node --test`); callers cannot supply commands or arguments.
-- Execute inside Docker with networking disabled, a read-only root filesystem and workspace snapshot, dropped Linux capabilities, no-new-privileges, a non-root UID, and CPU, memory, process, timeout, and output limits.
-- Stage a bounded snapshot that excludes VCS metadata, backup data, symlinks, and likely credential/secret files; only that snapshot is mounted into the container.
-- Require the prebuilt sandbox image to exist locally (`--pull=never`). Docker or image unavailability fails closed; the agent never falls back to host execution.
-- The Docker daemon and host kernel remain trusted parts of the security boundary. Validate the actual deployment daemon and image before production use.
-
-### Tool Workflow Executor
-- Execute a prevalidated sequence of registered tools in order.
-- Require task-level approval before a task workflow starts.
-- Preserve each protected tool's independent approval checks.
-- Stop immediately when a tool fails and record the task failure.
-- Return ordered per-step results for verification.
-
-### Safety Manager
-- Require approval for sensitive operations.
-- Protect API keys and credentials.
-- Prevent unauthorized file deletion or modification.
-- Keep operations within approved workspaces.
-
-### Burmese Chat Interface
-- Accept Burmese and English instructions.
-- Display understandable progress and error messages.
-- Ask for clarification when instructions are ambiguous.
-
-## 3. Project Structure
-
-- src/agent: Agent Core
-- src/accounts: Account Manager
-- src/projects: Project Manager
-- src/memory: Persistent Memory
-- src/backup: Backup and Recovery
-- src/safety: Safety and Permissions
-- src/ui: Chat Interface
-- tests: Automated Tests
-- data: Local application data
-- docs: Documentation
+## 3. Persistent Data
+The agent factory exposes `projectManager` and `projectMemory`. By default they use the workspace-local `.agent-data/` directory, which is excluded from Git. A deployment may pass a separate `dataRoot` to `createAgent`.
+- `projects.json`: project metadata only; no workspace contents are copied or deleted.
+- `project-memory.json`: project-scoped memory records, tags, type, and timestamps.
+- Storage is bounded to 5 MiB per JSON store and memory entries are bounded by count and content size.
+- Persistent records are validated when loaded. Invalid JSON/schema fails closed rather than silently resetting user data.
+- Writes use a temporary file, fsync, and atomic rename. The implementation serializes writes within a process; deployments with multiple server processes must use a transactional shared database before enabling concurrent multi-instance writes.
 
 ## 4. Security Principles
 - Never hardcode API keys, passwords, or tokens.
-- Never expose credentials in logs.
-- Follow provider authentication and service terms.
-- Do not use account switching to bypass quotas.
-- Ask for approval before destructive operations.
-- Require both trusted approval and the Docker isolation boundary for project-controlled test execution; never fall back to host execution.
+- Never expose credentials in logs or project memory.
+- Never delete project workspace files when deleting project metadata.
+- Require approval for sensitive operations.
+- Do not rotate accounts to bypass quotas or provider usage limits.
+- Require approval and Docker isolation for project-controlled test execution.
+- Treat the local data directory and host filesystem permissions as trusted deployment boundaries.
 
 ## 5. Development Phases
 1. Project foundation and repository architecture.
@@ -105,7 +43,4 @@ editing, debugging, testing, and persistent project memory.
 6. Android browser interface, hosted backend integration, and end-to-end release checks.
 
 ## 6. Testing
-- Use Node.js built-in test runner.
-- Test each module independently.
-- Run integration tests before release.
-- Report only verified results.
+Use Node.js built-in test runner and GitHub Actions. Run integration tests before release and report only verified results.
