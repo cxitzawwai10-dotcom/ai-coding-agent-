@@ -255,6 +255,45 @@ export class AgentCore {
   }
 
 
+
+  async executeToolSequence(taskId, steps) {
+    if (!Array.isArray(steps) || steps.length === 0) {
+      throw new Error("Tool sequence must contain at least one step.");
+    }
+
+    const normalizedSteps = steps.map((step, index) => {
+      if (!step || typeof step !== "object" || Array.isArray(step)) {
+        throw new Error(`Invalid tool sequence step at index ${index}.`);
+      }
+      const keys = Object.keys(step);
+      if (keys.some(key => !["toolId", "input", "options"].includes(key))) {
+        throw new Error(`Unsupported tool sequence field at index ${index}.`);
+      }
+      if (typeof step.toolId !== "string" || !this.toolRegistry.get(step.toolId)) {
+        throw new Error(`Unknown tool in sequence at index ${index}.`);
+      }
+      if (Object.hasOwn(step, "options") &&
+          (!step.options || typeof step.options !== "object" || Array.isArray(step.options))) {
+        throw new Error(`Invalid tool options at index ${index}.`);
+      }
+      return {
+        toolId: step.toolId,
+        input: step.input,
+        options: step.options ?? {}
+      };
+    });
+
+    return this.executeTask(taskId, async context => {
+      const results = [];
+      for (let index = 0; index < normalizedSteps.length; index += 1) {
+        const step = normalizedSteps[index];
+        const result = await this.executeTool(step.toolId, step.input, step.options);
+        results.push({ index, toolId: step.toolId, result });
+      }
+      return { stepsCompleted: results.length, results };
+    });
+  }
+
   requestToolApproval(id, input) {
     const tool = this.toolRegistry.get(id);
     if (!tool) throw new Error("Tool not found.");
