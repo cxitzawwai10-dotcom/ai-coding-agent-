@@ -18,7 +18,7 @@ export class AgentCore {
     this.executor = executor;
     this.approvalManager = new ApprovalManager();
     this.toolRegistry = toolRegistry ?? new ToolRegistry(
-      (id, input, options) => this.approvalManager.verify(id, input, options)
+      (id, input, options, binding) => this.approvalManager.verify(id, input, options, binding)
     );
     this.lifecycles = new Map();
   }
@@ -261,7 +261,7 @@ export class AgentCore {
     if (!tool.requiresApproval) {
       throw new Error("This tool does not require approval.");
     }
-    return this.approvalManager.request(id, input);
+    return this.approvalManager.request(id, input, this.toolRegistry.getApprovalBinding(id));
   }
 
   approveToolRequest(requestId) {
