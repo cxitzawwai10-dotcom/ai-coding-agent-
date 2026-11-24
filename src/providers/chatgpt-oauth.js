@@ -1,4 +1,3 @@
-import http from "node:http";
 import { createHash, randomBytes, randomUUID, createPublicKey, verify as verifySignature, constants } from "node:crypto";
 import { JsonStore } from "../storage/json-store.js";
 
@@ -22,7 +21,7 @@ async function verifyIdToken(token, clientId, nonce, fetchImpl) {
   const jwksResponse = await fetchImpl(JWKS_URL, { headers: { accept: "application/json" } });
   if (!jwksResponse.ok) throw new Error("Unable to retrieve OpenAI signing keys.");
   const jwks = await jwksResponse.json();
-  const jwk = jwks.keys?.find(key => key.kid === header.kid && key.use !== "enc");
+  const jwk = jwks.keys?.find(key => key.kid === header.kid && key.use === "sig" && (!key.alg || key.alg === header.alg) && (!Array.isArray(key.key_ops) || key.key_ops.includes("verify")));
   if (!jwk) throw new Error("OpenAI ID token signing key was not found.");
   const publicKey = createPublicKey({ key: jwk, format: "jwk" });
   const data = Buffer.from(parts[0] + "." + parts[1]);
@@ -126,6 +125,8 @@ export class ChatGPTOAuth {
     const state = url.searchParams.get("state");
     const tx = state && this.transactions.get(state);
     if (!tx || this.clock() - tx.createdAt > 10 * 60 * 1000) throw new Error("ChatGPT sign-in state is invalid or expired.");
+    const expected = new URL(tx.redirectUri);
+    if (url.protocol !== expected.protocol || url.hostname !== expected.hostname || url.port !== expected.port || url.pathname !== expected.pathname) throw new Error("ChatGPT OAuth callback does not match the registered loopback redirect URI.");
     this.transactions.delete(state);
     if (url.searchParams.get("error")) throw new Error(url.searchParams.get("error") === "access_denied" ? "ChatGPT sign-in or plan-usage permission was declined." : "ChatGPT authorization failed.");
     const code = url.searchParams.get("code");
