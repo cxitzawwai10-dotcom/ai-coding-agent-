@@ -25,8 +25,9 @@ test("CLI consent denies execution unless user enters y", async () => {
   const stdout = new PassThrough();
   let output = "";
   stdout.on("data", chunk => { output += chunk.toString(); });
+  const run = executeToolWithCliConsent(agent, "workspace.write", { path: "note.txt", content: "secret" }, { stdin, stdout });
   stdin.end("n\n");
-  const result = await executeToolWithCliConsent(agent, "workspace.write", { path: "note.txt", content: "secret" }, { stdin, stdout });
+  const result = await run;
   assert.deepEqual(result, { approved: false, executed: false });
   assert.equal(agent.calls.length, 0);
   assert.match(output, /DENIED/);
@@ -36,8 +37,9 @@ test("CLI consent executes with one-time token after y", async () => {
   const agent = createAgent();
   const stdin = new PassThrough();
   const stdout = new PassThrough();
+  const run = executeToolWithCliConsent(agent, "workspace.write", { path: "note.txt", content: "hello" }, { stdin, stdout });
   stdin.end("y\n");
-  const result = await executeToolWithCliConsent(agent, "workspace.write", { path: "note.txt", content: "hello" }, { stdin, stdout });
+  const result = await run;
   assert.equal(result.approved, true);
   assert.equal(result.executed, true);
   assert.equal(agent.calls.length, 1);
