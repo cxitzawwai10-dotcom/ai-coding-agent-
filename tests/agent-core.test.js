@@ -365,7 +365,7 @@ test("AgentCore rolls back earlier writes when a later file approval fails", asy
     await fs.writeFile(path.join(root, "source.js"), "original");
     const agent = new AgentCore();
     agent.attachWorkspace(root);
-    const task = await agent.processTask("Update two files transactionally");
+    await agent.inspectTaskWorkspace(task.taskId, ["source.js", "new.txt"], { allowMissing: true });
     await agent.inspectTaskWorkspace(task.taskId, ["source.js", "new.txt"]);
     agent.prepareCodingChanges(task.taskId, [
       { path: "source.js", content: "changed" },
