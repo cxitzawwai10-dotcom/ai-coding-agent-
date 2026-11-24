@@ -29,7 +29,7 @@ function validateState(state) {
   const ids = new Set();
   for (const account of state.accounts) {
     if (!account || typeof account.id !== "string" || ids.has(account.id) ||
-        !["gemini", "openai-compatible"].includes(account.provider) ||
+        !["gemini", "openai"].includes(account.provider) ||
         typeof account.label !== "string" || !account.encryptedSecret ||
         !Number.isFinite(Date.parse(account.createdAt)) ||
         (account.cooldownUntil !== null && !Number.isFinite(Date.parse(account.cooldownUntil)))) {
@@ -60,7 +60,7 @@ export class AccountVault {
   }
   async addAccount({ provider, label, apiKey }) {
     await this.ready;
-    if (!["gemini", "openai-compatible"].includes(provider)) throw new Error("Unsupported AI provider.");
+    if (!["gemini", "openai"].includes(provider)) throw new Error("Unsupported AI provider.");
     if (typeof label !== "string" || !label.trim() || label.length > 80) throw new Error("Account label must be 1-80 characters.");
     if (typeof apiKey !== "string" || apiKey.length < 8 || apiKey.length > 4096 || /[\r\n]/.test(apiKey)) throw new Error("Invalid API key.");
     if (this.state.accounts.length >= MAX_ACCOUNTS) throw new Error("Account limit reached.");
