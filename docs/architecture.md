@@ -18,10 +18,10 @@ It must support Burmese conversations, project management, code editing, debuggi
 - **Burmese Chat Interface:** Burmese and English instructions, understandable progress, and clarification for ambiguity.
 
 ## 3. Persistent Data
-The agent factory exposes `projectManager` and `projectMemory`. By default they use the workspace-local `.agent-data/` directory, which is excluded from Git. A deployment may pass a separate `dataRoot` to `createAgent`.
+The agent factory exposes `projectManager`, `projectMemory`, and a persistent `taskRegistry`. By default they use the workspace-local `.agent-data/` directory, which is excluded from Git. A deployment may pass a separate `dataRoot` to `createAgent`.
 - `projects.json`: project metadata only; no workspace contents are copied or deleted.
 - `project-memory.json`: project-scoped notes, decisions, task notes, and tags.
-- `tasks.json`: task descriptions, plans/results, status history, and lifecycle recovery data. Tasks interrupted in EXECUTING state are marked FAILED on restart; they are never automatically resumed.
+- `tasks.json`: task descriptions, plans/results, status history, and lifecycle recovery data. Tasks interrupted in EXECUTING state are marked FAILED on restart; they are never automatically resumed. Treat task content as private application data and never place credentials in it.
 - `project-memory.json`: project-scoped notes, decisions, task notes, and tags.
 - `tasks.json`: task descriptions, plans/results, status history, and lifecycle recovery data. Tasks interrupted in EXECUTING state are marked FAILED on restart; they are never automatically resumed.
 - `project-memory.json`: project-scoped memory records, tags, type, and timestamps.
