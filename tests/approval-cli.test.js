@@ -6,12 +6,13 @@ import { ApprovalManager } from "../src/safety/approval-manager.js";
 
 function createAgent() {
   const calls = [];
-  return {
+  const agent = {
     calls,
+    rejected: [],
     getTools: () => [{ id: "workspace.write", requiresApproval: true }],
     requestToolApproval: (id, input) => ({ requestId: "request-1", toolId: id, input }),
     approveToolRequest: () => "one-time-token",
-    rejectToolRequest: () => true,
+    rejectToolRequest: requestId => { agent.rejected.push(requestId); return true; },
     executeTool: async (id, input, options) => {
       calls.push({ id, input, options });
       return "written";
@@ -54,4 +55,16 @@ test("approval request input is isolated from caller mutation", () => {
   request.input.nested.value = 55;
   const token = manager.approve(request.requestId);
   assert.equal(manager.verify("workspace.write", { path: "note.txt", nested: {value: 1} }, { approvalToken: token }), true);
+});
+
+
+test("CLI consent denies and clears pending request when stdin reaches EOF", async () => {
+  const agent = createAgent();
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const run = executeToolWithCliConsent(agent, "workspace.write", { path: "note.txt", content: "no" }, { stdin, stdout });
+  stdin.end();
+  await assert.rejects(run, /input ended before a response/);
+  assert.equal(agent.calls.length, 0);
+  assert.deepEqual(agent.rejected, ["request-1"]);
 });
