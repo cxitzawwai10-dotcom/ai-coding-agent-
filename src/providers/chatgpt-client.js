@@ -11,6 +11,7 @@ export class ChatGPTClient {
     this.accountEpoch = 0;
     this.models = [];
     this.modelsForAccountId = null;
+    this.refreshes = new Map();
   }
   cancelActiveRequests() {
     this.accountEpoch++;
@@ -23,14 +24,26 @@ export class ChatGPTClient {
     const account = await this.accountStore.getActiveAccount();
     if (!account) throw new Error("Sign in with ChatGPT and select an account first.");
     if (!account.scopes.includes(PLAN_SCOPE)) throw new Error("This ChatGPT account has identity sign-in only; ChatGPT plan usage permission was not granted.");
+    if (account.needsReauth) throw new Error("This ChatGPT account needs to be reconnected. Choose Reconnect in the account list.");
     if (Date.parse(account.expiresAt) <= Date.now() + 60000) {
       if (!account.tokens.refreshToken) throw new Error("ChatGPT session expired. Sign in again to reconnect this account.");
-      const form = new URLSearchParams({ grant_type: "refresh_token", refresh_token: account.tokens.refreshToken, client_id: account.clientId, resource: API_BASE });
-      const response = await this.fetchImpl("https://auth.openai.com/api/accounts/oauth/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, body: form.toString() });
-      const refreshed = await response.json().catch(() => ({}));
-      if (!response.ok || !refreshed.access_token) throw new Error("ChatGPT session refresh failed (HTTP " + response.status + "). Sign in again.");
-      await this.accountStore.updateTokens(account.id, refreshed);
-      return refreshed.access_token;
+      if (this.refreshes.has(account.id)) return this.refreshes.get(account.id);
+      const refreshPromise = (async () => {
+        const form = new URLSearchParams({ grant_type: "refresh_token", refresh_token: account.tokens.refreshToken, client_id: account.clientId, resource: API_BASE });
+        const response = await this.fetchImpl("https://auth.openai.com/api/accounts/oauth/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, body: form.toString() });
+        const refreshed = await response.json().catch(() => ({}));
+        if (!response.ok || !refreshed.access_token) {
+          const code = refreshed.error || refreshed.code;
+          if (["invalid_grant","invalid_refresh_token","token_expired","refresh_token_expired","refresh_token_invalidated","refresh_token_reused"].includes(code)) await this.accountStore.clearCredentials(account.id);
+          throw new Error("ChatGPT session refresh failed (HTTP " + response.status + "). " + (code || "Reconnect the account if the session has expired."));
+        }
+        if (!refreshed.refresh_token || !Number.isFinite(Number(refreshed.expires_in))) throw new Error("ChatGPT refresh response did not include a replacement refresh token and expiry.");
+        await this.accountStore.updateTokens(account.id, refreshed);
+        return refreshed.access_token;
+      })();
+      this.refreshes.set(account.id, refreshPromise);
+      try { return await refreshPromise; }
+      finally { if (this.refreshes.get(account.id) === refreshPromise) this.refreshes.delete(account.id); }
     }
     return account.tokens.accessToken;
   }
