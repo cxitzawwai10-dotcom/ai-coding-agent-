@@ -85,3 +85,24 @@ test("browser API supports encrypted credential export and host-bound import", a
     assert.deepEqual(calls,[["export","account-1","long-transfer-passphrase"],["import",{version:1,ciphertext:"encrypted"},"long-transfer-passphrase"]]);
   }finally{await app.close();}
 });
+
+test("browser API rejects non-JSON bodies and sends browser isolation headers", async () => {
+  const token = "browser-security-token-with-more-than-32-characters";
+  const agent = { getStatus: () => "INITIALIZED", getTaskSummary: () => ({ total: 0 }), getTools: () => [], getTasks: () => [] };
+  const app = createBrowserServer({ agent, token, port: 0 });
+  const address = await app.listen();
+  try {
+    const base = "http://127.0.0.1:" + address.port;
+    const page = await fetch(base + "/");
+    assert.equal(page.headers.get("x-frame-options"), "DENY");
+    assert.equal(page.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(page.headers.get("permissions-policy"), "camera=(), microphone=(), geolocation=()");
+    const response = await fetch(base + "/api/chatgpt/login", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "text/plain" },
+      body: "{}"
+    });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /Content-Type must be application\/json/);
+  } finally { await app.close(); }
+});
