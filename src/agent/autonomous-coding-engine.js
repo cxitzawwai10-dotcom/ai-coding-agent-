@@ -29,7 +29,7 @@ export class AutonomousCodingEngine {
       prompt: task
     });
     const paths = parsePaths(plan.text);
-    const inspection = await this.agent.inspectTaskWorkspace(planned.taskId, paths);
+    const inspection = await this.agent.inspectTaskWorkspace(planned.taskId, paths, { allowMissing: true });
     const response = await this.providerClient.generate({
       model,
       systemInstruction: [
