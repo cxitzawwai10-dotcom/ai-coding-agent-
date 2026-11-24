@@ -382,6 +382,15 @@ test("AgentCore runs Node workspace tests only with trusted approval after codin
     const testRequest = agent.requestToolApproval("workspace.test", {});
     const testToken = agent.approveToolRequest(testRequest.requestId);
 
+    await assert.rejects(
+      agent.executeCodingChanges(task.taskId, [writeToken], ""),
+      /trusted approval token is required/
+    );
+    assert.equal(
+      await fs.readFile(path.join(root, "source.js"), "utf8"),
+      "export const value = 1;\\n"
+    );
+
     const result = await agent.executeCodingChanges(task.taskId, [writeToken], testToken);
     assert.equal(result.status, TASK_STATES.COMPLETED);
     assert.equal(result.result.tests.passed, true);
