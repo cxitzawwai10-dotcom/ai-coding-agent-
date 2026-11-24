@@ -5,6 +5,9 @@ import { PersistentTaskRegistry } from "./agent/persistent-task-registry.js";
 import { ProjectManager } from "./projects/project-manager.js";
 import { ProjectMemory } from "./memory/project-memory.js";
 import { executeToolWithCliConsent } from "./ui/approval-cli.js";
+import { AccountVault, ProviderClient } from "./providers/index.js";
+import { AutonomousCodingEngine } from "./agent/autonomous-coding-engine.js";
+import { createBrowserServer } from "./ui/browser-server.js";
 
 export function createAgent({
   workspaceRoot = process.cwd(),
@@ -18,6 +21,11 @@ export function createAgent({
   );
   const projectManager = new ProjectManager({ storePath: path.join(resolvedDataRoot, "projects.json") });
   const projectMemory = new ProjectMemory({ storePath: path.join(resolvedDataRoot, "project-memory.json") });
+  const accountVault = process.env.AI_AGENT_VAULT_KEY
+    ? new AccountVault({ filePath: path.join(resolvedDataRoot, "accounts.json") })
+    : null;
+  const providerClient = accountVault ? new ProviderClient({ accountVault }) : null;
+  const codingEngine = providerClient ? new AutonomousCodingEngine({ agent, providerClient }) : null;
 
   return {
     agent,
@@ -30,7 +38,7 @@ export function createAgent({
   };
 }
 
-export async function runToolCommand(agent, id, inputJson, io = {}) {
+export function createBrowserApp(options = {}) {\n  const services = createAgent(options);\n  const browser = createBrowserServer({\n    agent: services.agent, projectManager: services.projectManager,\n    accountVault: services.accountVault, codingEngine: services.codingEngine,\n    ...options.browser\n  });\n  return { ...services, browser };\n}\n\nexport async function runToolCommand(agent, id, inputJson, io = {}) {
   if (typeof inputJson !== "string") {
     throw new Error("Tool input must be supplied as JSON text.");
   }
