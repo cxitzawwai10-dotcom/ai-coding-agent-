@@ -125,3 +125,19 @@ test("loopback VM deployments can explicitly disable OAuth and require credentia
     assert.equal(loginCalls, 0);
   } finally { await app.close(); }
 });
+
+test("browser API rate limits repeated invalid bearer tokens without blocking a valid token", async () => {
+  const token = "browser-auth-rate-limit-token-with-32-characters";
+  const agent = { getStatus: () => "INITIALIZED", getTaskSummary: () => ({ total: 0 }), getTools: () => [], getTasks: () => [] };
+  const app = createBrowserServer({ agent, token, port: 0 });
+  const address = await app.listen();
+  try {
+    const base = "http://127.0.0.1:" + address.port;
+    let last;
+    for (let i = 0; i < 11; i++) last = await fetch(base + "/api/status", { headers: { authorization: "Bearer wrong-token" } });
+    assert.equal(last.status, 429);
+    assert.ok(Number(last.headers.get("retry-after")) > 0);
+    const allowed = await fetch(base + "/api/status", { headers: { authorization: "Bearer " + token } });
+    assert.equal(allowed.status, 200);
+  } finally { await app.close(); }
+});
