@@ -10,8 +10,11 @@ function parseProposal(text, inspectedPaths) {
   let value; try { value = JSON.parse(cleaned); } catch { throw new Error("AI proposal must be valid JSON."); }
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => key !== "files") || !Array.isArray(value.files) || value.files.length < 1 || value.files.length > 20) throw new Error("AI proposal must contain 1-20 file changes.");
   const seen = new Set();
+  let totalBytes = 0;
   for (const file of value.files) {
     if (!file || typeof file !== "object" || Array.isArray(file) || Object.keys(file).some(key => !["path", "content"].includes(key)) || typeof file.path !== "string" || !file.path.trim() || typeof file.content !== "string" || Buffer.byteLength(file.content) > 1024 * 1024 || seen.has(file.path) || !inspectedPaths.includes(file.path)) throw new Error("AI proposal contains an invalid, uninspected, or duplicate file change.");
+    totalBytes += Buffer.byteLength(file.content);
+    if (totalBytes > 2 * 1024 * 1024) throw new Error("AI proposal exceeds the 2 MiB total review limit.");
     seen.add(file.path);
   }
   return value.files;
@@ -42,7 +45,7 @@ export class AutonomousCodingEngine {
     const files = parseProposal(response.text, paths);
     const proposal = this.agent.prepareCodingChanges(planned.taskId, files);
     const approval = this.agent.approveTask(planned.taskId);
-    return { taskId: planned.taskId, status: approval.status, approvalRequired: true, changes: proposal.changes.map(change => ({ ...change, preview: files.find(file => file.path === change.path).content.slice(0, 20000), previewTruncated: files.find(file => file.path === change.path).content.length > 20000 })), note: "Review the displayed file previews. Press the approval button only when you authorize all listed changes and the test run." };
+    return { taskId: planned.taskId, status: approval.status, approvalRequired: true, changes: proposal.changes.map(change => ({ ...change, preview: files.find(file => file.path === change.path).content, previewTruncated: false })), note: "Review the complete content of every listed file. Press the approval button only when you authorize all changes and the test run." };
   }
   async executeApproved({ taskId, approvalTokens, testApprovalToken = null }) {
     return this.agent.executeCodingChanges(taskId, approvalTokens, testApprovalToken);
