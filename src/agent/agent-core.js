@@ -357,40 +357,62 @@ export class AgentCore {
         throw new Error("Workspace test tool is not registered.");
       }
     }
+    if (!this.workspaceTools) throw new Error("Workspace tools are not attached.");
     return this.executeTask(taskId, async () => {
+      const snapshots = [];
+      for (const change of changes) {
+        snapshots.push(await this.workspaceTools.capture(change.path));
+      }
       const results = [];
-      for (let index = 0; index < changes.length; index += 1) {
-        const change = changes[index];
-        const result = await this.executeTool(
-          "workspace.write",
-          change,
-          { approvalToken: approvalTokens[index] }
-        );
-        results.push({ index, path: change.path, result });
-      }
-      let tests = null;
-      if (testApprovalToken !== null) {
-        tests = await this.executeTool(
-          "workspace.test",
-          {},
-          { approvalToken: testApprovalToken }
-        );
-        if (!tests.passed) {
-          const details = [tests.error, tests.stderr, tests.stdout]
-            .filter(Boolean)
-            .join("\n")
-            .slice(0, 4000);
-          throw new Error("Workspace tests failed after " + results.length + " file change(s). " + details);
+      try {
+        for (let index = 0; index < changes.length; index += 1) {
+          const change = changes[index];
+          const result = await this.executeTool(
+            "workspace.write",
+            change,
+            { approvalToken: approvalTokens[index] }
+          );
+          results.push({ index, path: change.path, result });
         }
+        let tests = null;
+        if (testApprovalToken !== null) {
+          tests = await this.executeTool(
+            "workspace.test",
+            {},
+            { approvalToken: testApprovalToken }
+          );
+          if (!tests.passed) {
+            const details = [tests.error, tests.stderr, tests.stdout]
+              .filter(Boolean)
+              .join("\\n")
+              .slice(0, 4000);
+            throw new Error("Workspace tests failed after " + results.length + " file change(s). " + details);
+          }
+        }
+        return {
+          changesApplied: results.length,
+          verification: tests
+            ? "All workspace tests passed after the approved file changes."
+            : "File writes completed; automated tests were not requested.",
+          tests,
+          rollback: null,
+          results
+        };
+      } catch (error) {
+        const rollbackErrors = [];
+        for (const snapshot of snapshots.slice(0, results.length).reverse()) {
+          try {
+            await this.workspaceTools.restore(snapshot);
+          } catch (rollbackError) {
+            rollbackErrors.push(rollbackError instanceof Error ? rollbackError.message : String(rollbackError));
+          }
+        }
+        const original = error instanceof Error ? error.message : String(error);
+        if (rollbackErrors.length) {
+          throw new Error(original + " Rollback incomplete: " + rollbackErrors.join("; ").slice(0, 2000));
+        }
+        throw new Error(original + " All applied file changes were rolled back.");
       }
-      return {
-        changesApplied: results.length,
-        verification: tests
-          ? "All workspace tests passed after the approved file changes."
-          : "File writes completed; automated tests were not requested.",
-        tests,
-        results
-      };
     });
   }
 
@@ -451,6 +473,7 @@ export class AgentCore {
 
   attachWorkspace(root) {
     const workspace = registerWorkspaceTools(this.toolRegistry, root);
+    this.workspaceTools = workspace;
     registerTestTools(this.toolRegistry, root);
     return workspace;
   }
