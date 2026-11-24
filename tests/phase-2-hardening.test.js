@@ -110,7 +110,8 @@ test("CLI clears pending approval when input ends unexpectedly", async () => {
   };
   const stdin = new PassThrough();
   const stdout = new PassThrough();
+  const run = executeToolWithCliConsent(agent, "workspace.write", { path: "note.txt", content: "hello" }, { stdin, stdout });
   stdin.end();
-  await assert.rejects(executeToolWithCliConsent(agent, "workspace.write", { path: "note.txt", content: "hello" }, { stdin, stdout }));
+  await assert.rejects(run);
   assert.equal(rejected, 1);
 });
