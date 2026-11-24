@@ -28,4 +28,4 @@ jobs:
 
       - name: Run automated tests
         timeout-minutes: 8
-        run: npm test -- --test-reporter=spec
+        run: npm test -- --test-reporter=spec --test-timeout=30000
