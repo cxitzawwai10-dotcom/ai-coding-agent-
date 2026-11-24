@@ -1,0 +1,6 @@
+# Replace with a domain whose DNS A/AAAA records point to this VM.
+# Keep port 8787 private; only Caddy should be reachable from the Internet.
+agent.example.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8787
+}
