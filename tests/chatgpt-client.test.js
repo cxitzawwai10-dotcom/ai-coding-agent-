@@ -28,3 +28,28 @@ test("does not infer when ChatGPT plan scope is absent", async () => {
   const client = new ChatGPTClient({accountStore:{async getActiveAccount(){return {id:"a",scopes:["openid"],expiresAt:new Date().toISOString(),tokens:{}};}},fetchImpl:async()=>{throw new Error("must not fetch");}});
   await assert.rejects(client.listModels(),/identity sign-in only/);
 });
+
+test("serializes rotating refresh-token requests for a single account", async () => {
+  const account = { id:"refresh-account", clientId:"oaiapp_refresh", scopes:["chatgpt.tokens.use.direct"], expiresAt:new Date(0).toISOString(), tokens:{accessToken:"old-access",refreshToken:"old-refresh"} };
+  let refreshCalls=0, updated=0;
+  const store = {
+    async getActiveAccount(){return {...account};},
+    async updateTokens(id,tokens){assert.equal(id,account.id);updated++;account.tokens={accessToken:tokens.access_token,refreshToken:tokens.refresh_token};account.expiresAt=new Date(Date.now()+Number(tokens.expires_in)*1000).toISOString();}
+  };
+  const client = new ChatGPTClient({accountStore:store,fetchImpl:async(url,options={})=>{
+    if(url.includes("/oauth/token")){refreshCalls++;await new Promise(resolve=>setTimeout(resolve,15));return {ok:true,json:async()=>({access_token:"new-access",refresh_token:"new-refresh",expires_in:3600})};}
+    if(url.endsWith("/models")){assert.equal(options.headers.authorization,"Bearer new-access");return {ok:true,json:async()=>({models:[]})};}
+    throw new Error("Unexpected URL");
+  }});
+  await Promise.all([client.listModels(),client.listModels()]);
+  assert.equal(refreshCalls,1);
+  assert.equal(updated,1);
+});
+
+test("clears a terminally revoked refresh token without switching accounts", async () => {
+  let cleared = null;
+  const account = {id:"revoked",clientId:"oaiapp_revoked",scopes:["chatgpt.tokens.use.direct"],expiresAt:new Date(0).toISOString(),tokens:{accessToken:"old",refreshToken:"revoked"}};
+  const client = new ChatGPTClient({accountStore:{async getActiveAccount(){return account;},async clearCredentials(id){cleared=id;}},fetchImpl:async()=>({ok:false,status:400,json:async()=>({error:"invalid_grant"})})});
+  await assert.rejects(client.listModels(),/refresh failed/);
+  assert.equal(cleared,"revoked");
+});
